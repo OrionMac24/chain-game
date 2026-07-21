@@ -11,12 +11,12 @@ Date: July 21, 2026
 - Prevented every duplicate word from scoring twice and marked repeated words as already banked in the live feedback.
 - Raised the Daily opening guarantee to at least 20 distinct reachable words and added the 20-word qualification state, progress HUD, tutorial, success toast, failure result, and tomorrow-unlocked home state.
 - Reworked the tutorial with illustrated board examples, shorter mobile copy, and a guided first-run coach.
-- Made a red trail collision fatal in Daily. Reversing into the previous red tile now ends the run instead of showing a blocked-path message.
+- Red-trail collisions now use the shared two-life rule. The first collision shows a one-life warning and removes free-start choices. A second mistake ends the run.
 - Kept Practice forgiving with a separate rewind action.
 - Added one rewarded revive per Daily run. The revive restores the exact state before the fatal move. A second death offers only End Run.
-- Added a rewarded word hint with a visible route. Early hints prefer the planted easy starter word.
+- Removed the rewarded word-hint control from gameplay.
 - Added a clear final score state and Daily score lock.
-- Added Supabase email authentication, username creation, profile editing, Apple sign-in support on iOS, account deletion, and a real-time global top-100 leaderboard.
+- Added Supabase email authentication, username creation, profile editing, account deletion, and a real-time global top-100 leaderboard. Apple sign-in is removed.
 - Added RevenueCat paywalls, Chain Pro entitlement checks, restore purchases, customer information, and Customer Center entry points for iOS and Android.
 - Added Google Mobile Ads rewarded placements for revive and word hint, gated behind the consent flow.
 - Replaced the old logo treatment and created a restrained geometric app icon for web, iOS, and Android.
@@ -30,16 +30,15 @@ Date: July 21, 2026
 - Shell sync script syntax: pass.
 - Board generation: 10,000 deterministic boards checked, minimum 20 reachable opening words, minimum 16 vowels, maximum one combined Q, J, X, or Z.
 - Duplicate scoring: rejected without changing score or the banked-word list.
-- Reverse collision: checked as a fatal red-trail target.
+- Reverse collision: checked as a first-life loss and free-start penalty.
 
 ## Browser checks
 
 - Mobile home and button spacing: pass.
 - Tutorial pages and guided first move: pass.
-- Red trail death overlay: pass.
+- Red-trail life warning and second-mistake ending: pass.
 - Rewarded revive: pass.
 - One-revive limit: pass.
-- Rewarded friendly word route: pass.
 
 ## External release steps still required
 

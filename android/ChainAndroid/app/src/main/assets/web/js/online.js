@@ -7,7 +7,12 @@
   const client = configured ? window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey) : null;
   let session = null;
   let leaderboardChannel = null;
-  let pendingAppleUsername = null;
+  let leaderboardRefreshTimer = null;
+  let leaderboardRefreshDebounce = null;
+  let globalBestScore = 0;
+  let globalBestLoaded = false;
+  let playerBestScore = 0;
+  let playerBestLoaded = false;
 
   // This creates the accessible account and leaderboard layer once, outside the Phaser canvas.
   function ensurePanel() {
@@ -49,6 +54,14 @@
       client.removeChannel(leaderboardChannel);
       leaderboardChannel = null;
     }
+    if (leaderboardRefreshTimer) {
+      window.clearInterval(leaderboardRefreshTimer);
+      leaderboardRefreshTimer = null;
+    }
+    if (leaderboardRefreshDebounce) {
+      window.clearTimeout(leaderboardRefreshDebounce);
+      leaderboardRefreshDebounce = null;
+    }
   }
 
   // This shows one real connection error when the owner has not added Supabase project credentials yet.
@@ -71,8 +84,16 @@
     }
     const response = await client.auth.getSession();
     session = response.data.session;
+    await loadGlobalBest();
+    if (session) {
+      await loadPlayerBest();
+    }
     client.auth.onAuthStateChange(function rememberSession(event, nextSession) {
       session = nextSession;
+      playerBestLoaded = false;
+      if (session) {
+        loadPlayerBest();
+      }
       if (window.chainGame) {
         const scene = window.chainGame.scene.getScene("AppScene");
         if (scene && scene.screen === "home") { scene.showHome(scene.currentMode); }
@@ -89,7 +110,55 @@
     return session ? "PROFILE" : "SIGN IN";
   }
 
-  // This opens email and Sign in with Apple entry, or the signed-in profile controls.
+  // This gives signed-out visitors the public all-time record and signed-in players their own local best.
+  function homeScore(localBest) {
+    const personalBest = Math.max(Number(localBest || 0), playerBestLoaded ? playerBestScore : 0);
+    return session
+      ? { label: "YOUR HIGHEST SCORE", value: personalBest.toLocaleString("en-US") }
+      : { label: "GLOBAL HIGHEST SCORE", value: globalBestLoaded ? globalBestScore.toLocaleString("en-US") : "…" };
+  }
+
+  // This reads the single highest score ever submitted without requiring an account.
+  async function loadGlobalBest() {
+    if (!client) {
+      globalBestLoaded = true;
+      return;
+    }
+    const response = await client.from("daily_scores").select("score").order("score", { ascending: false }).limit(1);
+    if (!response.error) {
+      globalBestScore = response.data && response.data[0] ? Number(response.data[0].score) : 0;
+      globalBestLoaded = true;
+      if (window.chainGame) {
+        const scene = window.chainGame.scene.getScene("AppScene");
+        if (scene && scene.screen === "home") {
+          scene.showHome(scene.currentMode);
+        }
+      }
+    }
+  }
+
+  // This loads the signed-in player's best submitted score so it follows them across devices.
+  async function loadPlayerBest() {
+    if (!client || !session) {
+      playerBestScore = 0;
+      playerBestLoaded = false;
+      return;
+    }
+    const response = await client.from("daily_scores").select("score").eq("user_id", session.user.id)
+      .order("score", { ascending: false }).limit(1);
+    if (!response.error) {
+      playerBestScore = response.data && response.data[0] ? Number(response.data[0].score) : 0;
+      playerBestLoaded = true;
+      if (window.chainGame) {
+        const scene = window.chainGame.scene.getScene("AppScene");
+        if (scene && scene.screen === "home") {
+          scene.showHome(scene.currentMode);
+        }
+      }
+    }
+  }
+
+  // This opens email account entry or the signed-in profile controls.
   async function openAccount() {
     const content = openPanel();
     if (!client) {
@@ -97,10 +166,9 @@
       return;
     }
     if (!session) {
-      content.innerHTML = "<p class='online-kicker'>GLOBAL PROFILE</p><h2>Join the leaderboard</h2><p>New player? Choose a public username. Returning players only need email and password. Apple can provide Hide My Email.</p><form id='sign-in-form'><label>USERNAME FOR NEW ACCOUNTS<input name='username' minlength='3' maxlength='18' pattern='[A-Za-z0-9_]{3,18}' autocomplete='nickname'></label><label>EMAIL<input name='email' type='email' autocomplete='email' required></label><label>PASSWORD<input name='password' type='password' minlength='8' autocomplete='current-password' required></label><button type='submit'>CREATE ACCOUNT</button><button id='email-sign-in' class='secondary-online in-form' type='button'>SIGN IN WITH EMAIL</button></form><button id='apple-sign-in' class='secondary-online' type='button'>CONTINUE WITH APPLE</button><button id='privacy-info' class='quiet-online' type='button'>PRIVACY &amp; DATA</button><p id='account-status' class='online-status' aria-live='polite'></p>";
+      content.innerHTML = "<p class='online-kicker'>GLOBAL PROFILE</p><h2>Join the leaderboard</h2><p>New player? Choose a public username, email, and password. Returning players can leave username blank and sign in with email.</p><form id='sign-in-form'><label>USERNAME FOR NEW ACCOUNTS<input name='username' minlength='3' maxlength='18' pattern='[A-Za-z0-9_]{3,18}' autocomplete='nickname'></label><label>EMAIL<input name='email' type='email' autocomplete='email' required></label><label>PASSWORD<input name='password' type='password' minlength='8' autocomplete='current-password' required></label><button type='submit'>CREATE ACCOUNT</button><button id='email-sign-in' class='secondary-online in-form' type='button'>SIGN IN WITH EMAIL</button></form><button id='privacy-info' class='quiet-online' type='button'>PRIVACY &amp; DATA</button><p id='account-status' class='online-status' aria-live='polite'></p>";
       content.querySelector("#sign-in-form").addEventListener("submit", createEmailAccount);
       content.querySelector("#email-sign-in").addEventListener("click", signInWithEmail);
-      content.querySelector("#apple-sign-in").addEventListener("click", signInWithApple);
       content.querySelector("#privacy-info").addEventListener("click", showPrivacyInfo);
       return;
     }
@@ -157,27 +225,29 @@
     if (!credentials) { return; }
     const status = document.getElementById("account-status");
     status.textContent = "Creating your account...";
-    const usernameCheck = await client.from("profiles").select("id").eq("username", credentials.username).limit(1);
-    if (usernameCheck.error) {
-      status.textContent = usernameCheck.error.message;
-      return;
-    }
-    if (usernameCheck.data.length) {
-      status.textContent = "That username is taken. Try another one.";
-      return;
-    }
     const response = await client.auth.signUp({
       email: credentials.email,
       password: credentials.password,
-      options: { data: { username: credentials.username } }
+      options: {
+        data: { username: credentials.username },
+        emailRedirectTo: config.authRedirectUrl || window.location.origin
+      }
     });
     if (response.error) {
-      status.textContent = response.error.message;
+      status.textContent = friendlyAuthError(response.error);
       return;
     }
     session = response.data.session;
-    status.textContent = session ? "Account created. You are signed in." : "Account created. Confirm the email Supabase sent you, then sign in here.";
-    if (session) { await openAccount(); }
+    if (session) {
+      const profileResult = await ensureMyProfile(credentials.username);
+      if (profileResult.error) {
+        status.textContent = profileResult.error;
+        return;
+      }
+      await openAccount();
+      return;
+    }
+    status.textContent = "Account created. Open the confirmation email from CHAIN, then return here and sign in.";
   }
 
   // This signs an existing player in with the same email and password on web, iOS, and Android.
@@ -188,57 +258,53 @@
     status.textContent = "Signing you in...";
     const response = await client.auth.signInWithPassword({ email: credentials.email, password: credentials.password });
     if (response.error) {
-      status.textContent = response.error.message;
+      status.textContent = friendlyAuthError(response.error);
       return;
     }
     session = response.data.session;
+    const profileResult = await ensureMyProfile(credentials.username || session.user.user_metadata.username);
+    if (profileResult.error) {
+      status.textContent = profileResult.error;
+      return;
+    }
     await openAccount();
   }
 
-  // This starts Apple's OAuth flow, which includes Apple's Hide My Email choice.
-  async function signInWithApple() {
-    const status = document.getElementById("account-status");
-    const usernameInput = document.querySelector("#sign-in-form input[name='username']");
-    if (!usernameInput || !/^[A-Za-z0-9_]{3,18}$/.test(usernameInput.value.trim())) {
-      status.textContent = "Choose a username before continuing with Apple.";
-      return;
+  // This turns Supabase's technical authentication errors into clear next actions for a player.
+  function friendlyAuthError(error) {
+    const message = String(error && error.message || "Sign-in could not be completed.");
+    if (/invalid login credentials/i.test(message)) {
+      return "Email or password is incorrect. If this is a new account, create it first.";
     }
-    status.textContent = "Opening Apple sign-in...";
-    pendingAppleUsername = usernameInput.value.trim();
-    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.chainAuth) {
-      window.webkit.messageHandlers.chainAuth.postMessage({ action: "apple" });
-      return;
+    if (/email not confirmed/i.test(message)) {
+      return "Confirm the email from CHAIN first, then sign in again.";
     }
-    if (window.location.protocol === "file:" && !config.authRedirectUrl) {
-      status.textContent = "Apple sign-in needs the public app URL in CHAIN_CONFIG. Email sign-in works now.";
-      return;
+    if (/user already registered/i.test(message)) {
+      return "That email already has an account. Use Sign in with email instead.";
     }
-    const response = await client.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: config.authRedirectUrl || window.location.origin } });
-    if (response.error) { status.textContent = response.error.message; }
+    if (/rate limit/i.test(message)) {
+      return "Too many attempts. Wait a minute, then try again.";
+    }
+    return message;
   }
 
-  // The native iOS Apple sheet returns its identity token here for secure Supabase authentication.
-  async function completeAppleSignIn(token, nonce, errorMessage) {
-    const status = document.getElementById("account-status");
-    if (errorMessage || !token || !nonce) {
-      if (status) { status.textContent = errorMessage || "Apple sign-in did not complete."; }
-      return;
+  // This repairs a missing profile after authentication and keeps account creation independent of public table reads.
+  async function ensureMyProfile(username) {
+    if (!session) {
+      return { error: "Sign in before creating a public profile." };
     }
-    const response = await client.auth.signInWithIdToken({ provider: "apple", token: token, nonce: nonce });
-    if (response.error) {
-      if (status) { status.textContent = response.error.message; }
-      return;
+    const response = await client.rpc("ensure_my_profile", { p_username: String(username || "").trim() || null });
+    if (!response.error) {
+      return { profile: response.data, error: null };
     }
-    session = response.data.session;
-    if (pendingAppleUsername && session) {
-      const usernameResponse = await client.from("profiles").update({ username: pendingAppleUsername }).eq("id", session.user.id);
-      if (usernameResponse.error && status) {
-        status.textContent = usernameResponse.error.message;
-        return;
-      }
+    const existing = await client.from("profiles").select("id,username").eq("id", session.user.id).maybeSingle();
+    if (!existing.error && existing.data) {
+      return { profile: existing.data, error: null };
     }
-    pendingAppleUsername = null;
-    await openAccount();
+    if (/function public\.ensure_my_profile|schema cache/i.test(response.error.message)) {
+      return { error: "Your Supabase account tables need the latest CHAIN migration. Run the new auth and leaderboard SQL, then try again." };
+    }
+    return { error: friendlyAuthError(response.error) };
   }
 
   // This updates the public profile while the database uniqueness rule protects existing names.
@@ -257,16 +323,33 @@
       return;
     }
     const date = window.ChainState.dateKey();
-    const response = await client.from("daily_scores").select("user_id,username,score,words").eq("challenge_date", date).order("score", { ascending: false }).limit(100);
+    const list = content.querySelector("#leaderboard-list");
+    if (!list) {
+      return;
+    }
+    const response = await client.from("daily_scores").select("user_id,username,score,words,submitted_at").eq("challenge_date", date)
+      .order("score", { ascending: false }).order("words", { ascending: false }).order("submitted_at", { ascending: true }).limit(100);
     if (response.error) {
-      content.querySelector("#leaderboard-list").innerHTML = "<p class='online-status'>" + escapeHTML(response.error.message) + "</p>";
+      list.innerHTML = "<p class='online-status'>" + escapeHTML(response.error.message) + "</p>";
       return;
     }
     const rows = response.data || [];
-    content.querySelector("#leaderboard-list").innerHTML = rows.length ? rows.map(function renderRow(row, index) {
+    list.innerHTML = rows.length ? rows.map(function renderRow(row, index) {
       const isYou = session && row.user_id === session.user.id;
       return "<li class='" + (isYou ? "is-you" : "") + "'><span>" + (index + 1) + "</span><strong>" + escapeHTML(row.username) + "</strong><small>" + row.words + " words</small><b>" + Number(row.score).toLocaleString("en-US") + "</b></li>";
-    }).join("") : "<p class='online-status'>No scores yet. Be the first to finish today's CHAIN.</p>";
+    }).join("") : "<p class='online-status'>No scores yet. Be the first to bank a word today.</p>";
+    const liveStatus = content.querySelector("#leaderboard-live-status");
+    if (liveStatus) {
+      liveStatus.textContent = "LIVE · UPDATED " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+  }
+
+  // This collapses bursts of score events into one fresh ranking query.
+  function scheduleLeaderboardRefresh() {
+    if (leaderboardRefreshDebounce) {
+      window.clearTimeout(leaderboardRefreshDebounce);
+    }
+    leaderboardRefreshDebounce = window.setTimeout(refreshLeaderboard, 180);
   }
 
   // This opens today's ranking and subscribes to inserts and updates so positions move without refreshes.
@@ -276,11 +359,17 @@
       showConnectionSetup(content);
       return;
     }
-    content.innerHTML = "<p class='online-kicker'>TODAY'S GLOBAL CHALLENGE</p><h2>Global leaderboard</h2><p>Rankings update automatically whenever a signed-in player finishes.</p><ol id='leaderboard-list' class='leaderboard-list'><p class='online-status'>Loading scores…</p></ol>";
+    content.innerHTML = "<p class='online-kicker'>TODAY'S GLOBAL CHALLENGE</p><h2>Global leaderboard</h2><p>Rankings move automatically whenever a signed-in player banks a word.</p><p id='leaderboard-live-status' class='leaderboard-live'>CONNECTING</p><ol id='leaderboard-list' class='leaderboard-list'><p class='online-status'>Loading scores…</p></ol>";
     await refreshLeaderboard();
     leaderboardChannel = client.channel("daily-leaderboard-" + window.ChainState.dateKey())
-      .on("postgres_changes", { event: "*", schema: "public", table: "daily_scores", filter: "challenge_date=eq." + window.ChainState.dateKey() }, refreshLeaderboard)
-      .subscribe();
+      .on("postgres_changes", { event: "*", schema: "public", table: "daily_scores" }, scheduleLeaderboardRefresh)
+      .subscribe(function showRealtimeStatus(status) {
+        const liveStatus = document.getElementById("leaderboard-live-status");
+        if (liveStatus && status !== "SUBSCRIBED") {
+          liveStatus.textContent = "SYNCING";
+        }
+      });
+    leaderboardRefreshTimer = window.setInterval(refreshLeaderboard, 10000);
   }
 
   // This asks a protected database function to keep only the player's best score for today's challenge.
@@ -293,16 +382,32 @@
       p_words: result.words,
       p_board_hash: result.hash
     });
+    if (!response.error) {
+      globalBestScore = Math.max(globalBestScore, Number(result.score || 0));
+      globalBestLoaded = true;
+      playerBestScore = Math.max(playerBestScore, Number(result.score || 0));
+      playerBestLoaded = true;
+      scheduleLeaderboardRefresh();
+    }
     return { submitted: !response.error, error: response.error || null };
+  }
+
+  // This posts the current best score after every successful Daily word, not only at the end of a run.
+  async function submitBoardScore(board) {
+    if (!board) {
+      return { submitted: false };
+    }
+    return submitDailyScore({ score: board.score, words: board.wordsFound.length, hash: board.getHash() });
   }
 
   window.ChainOnline = {
     initialize: initialize,
     accountLabel: accountLabel,
+    homeScore: homeScore,
     openAccount: openAccount,
     openLeaderboard: openLeaderboard,
     submitDailyScore: submitDailyScore,
-    completeAppleSignIn: completeAppleSignIn
+    submitBoardScore: submitBoardScore
   };
   window.addEventListener("DOMContentLoaded", initialize);
 }());

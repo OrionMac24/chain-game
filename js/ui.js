@@ -57,6 +57,7 @@
       this.animating = false;
       this.runEnded = false;
       this.coachingActive = false;
+      this.lifeWarningActive = false;
       this.gameCoachStage = -1;
     }
 
@@ -67,7 +68,7 @@
       this.input.keyboard.addCapture([
         Phaser.Input.Keyboard.KeyCodes.UP, Phaser.Input.Keyboard.KeyCodes.DOWN,
         Phaser.Input.Keyboard.KeyCodes.LEFT, Phaser.Input.Keyboard.KeyCodes.RIGHT,
-        Phaser.Input.Keyboard.KeyCodes.SPACE, Phaser.Input.Keyboard.KeyCodes.BACKSPACE
+        Phaser.Input.Keyboard.KeyCodes.SPACE
       ]);
       this.input.keyboard.on("keydown", this.handleKeyDown, this);
       this.input.on("pointerdown", this.handlePointerDown, this);
@@ -139,7 +140,7 @@
       const shade = this.add.rectangle(width / 2, height / 2, width, height, COLORS.background, 0.98)
         .setDepth(100).setInteractive();
       this.track(shade, this.orientationObjects);
-      this.track(this.add.text(width / 2, height / 2 - 30, "TURN YOUR PHONE", {
+      this.track(this.add.text(width / 2, height / 2 - 30, "TURN  YOUR  PHONE", {
         fontFamily: FONTS.display, fontSize: "30px", fontStyle: "bold", color: COLORS.white
       }).setOrigin(0.5).setDepth(101), this.orientationObjects);
       this.track(this.add.text(width / 2, height / 2 + 22, "CHAIN is designed for portrait play.\nRotate upright for a sharp, full-size board.", {
@@ -158,7 +159,8 @@
       const background = this.add.rectangle(0, 0, width, buttonHeight, fill, settings.alpha === undefined ? 0.94 : settings.alpha)
         .setStrokeStyle(settings.strokeWidth === undefined ? 1 : settings.strokeWidth, stroke, settings.strokeAlpha === undefined ? 0.92 : settings.strokeAlpha);
       const brightFill = fill === COLORS.tile || fill === COLORS.cyan || fill === COLORS.magenta || fill === COLORS.green;
-      const text = this.add.text(0, 0, label, {
+      const displayLabel = String(label).replace(/ +/g, "  ");
+      const text = this.add.text(0, 0, displayLabel, {
         fontFamily: FONTS.ui,
         fontSize: (settings.fontSize || 15) + "px",
         fontStyle: "bold",
@@ -200,9 +202,11 @@
     createModeSwitcher(mode, y, group) {
       const active = mode === "practice" ? "practice" : "daily";
       const width = Math.min(460, this.scale.width - 48);
-      const segment = width / 2;
+      const gap = 12;
+      const segment = (width - gap) / 2;
       const x = this.scale.width / 2;
-      this.createButton("DAILY", x - segment / 2, y, segment, this.showHome.bind(this, "daily"), {
+      const offset = (segment + gap) / 2;
+      this.createButton("DAILY", x - offset, y, segment, this.showHome.bind(this, "daily"), {
         fill: active === "daily" ? COLORS.cyan : COLORS.panel,
         stroke: COLORS.cyan,
         textColor: active === "daily" ? COLORS.ink : COLORS.tertiary,
@@ -216,7 +220,7 @@
         fontSize: 13,
         group: group
       });
-      this.createButton("PRACTICE", x + segment / 2, y, segment, this.showHome.bind(this, "practice"), {
+      this.createButton("PRACTICE", x + offset, y, segment, this.showHome.bind(this, "practice"), {
         fill: active === "practice" ? COLORS.magenta : COLORS.panel,
         stroke: COLORS.magenta,
         textColor: active === "practice" ? COLORS.ink : COLORS.tertiary,
@@ -237,6 +241,7 @@
       this.currentMode = mode === "practice" ? "practice" : "daily";
       this.screen = "home";
       this.runEnded = false;
+      this.lifeWarningActive = false;
       this.clearEverything();
       this.drawBackdrop();
       const width = this.scale.width;
@@ -268,28 +273,35 @@
         ? Math.min(height - (height < 620 ? 205 : 185), heroY + 220)
         : Math.min(height - 205, heroY + 230);
       this.drawWeekActivity(activityY, save);
-      const rankY = activityY + (compactHome ? 76 : 82);
-      this.track(this.add.text(centreX - 12, rankY, "YOUR HIGHEST SCORE", {
-        fontFamily: FONTS.ui, fontSize: (width < 360 ? 10 : 12) + "px", fontStyle: "bold", color: COLORS.muted, letterSpacing: width < 360 ? 0.5 : 0.9
-      }).setOrigin(1, 0.5));
-      this.track(this.add.text(centreX + 12, rankY, save.bestScore.toLocaleString("en-US"), {
-        fontFamily: FONTS.data, fontSize: "13px", color: COLORS.white, letterSpacing: 0.6
+      const veryShortHome = height < 620;
+      const scoreY = activityY + (veryShortHome ? 78 : (compactHome ? 88 : 96));
+      const scoreWidth = Math.min(260, width - 72);
+      const scoreHeight = veryShortHome ? 38 : 48;
+      const homeScore = window.ChainOnline.homeScore(save.bestScore);
+      this.track(this.add.rectangle(centreX, scoreY, scoreWidth, scoreHeight, COLORS.panel, 0.96)
+        .setStrokeStyle(1, COLORS.grid, 0.75));
+      this.track(this.add.text(centreX - scoreWidth / 2 + 16, scoreY, homeScore.label, {
+        fontFamily: FONTS.ui, fontSize: (width < 360 ? 9 : 10) + "px", fontStyle: "bold", color: COLORS.muted, letterSpacing: 0.8
       }).setOrigin(0, 0.5));
-      const utilityY = Math.min(height - 87, rankY + (compactHome ? 44 : 48));
-      const utilityGap = 12;
+      this.track(this.add.text(centreX + scoreWidth / 2 - 16, scoreY, homeScore.value, {
+        fontFamily: FONTS.data, fontSize: (veryShortHome ? 18 : 22) + "px", fontStyle: "bold", color: "#69F23B", letterSpacing: 0.4
+      }).setOrigin(1, 0.5));
+      const utilityY = veryShortHome ? scoreY + 40 : scoreY + (compactHome ? 62 : 68);
+      const utilityGap = 14;
       const utilityWidth = Math.min(150, (width - 48 - utilityGap) / 2);
       const utilityOffset = (utilityWidth + utilityGap) / 2;
       this.createButton("HOW TO PLAY", centreX - utilityOffset, utilityY, utilityWidth, this.showTutorial.bind(this, 0), {
         fill: COLORS.panel, stroke: COLORS.grid, textColor: COLORS.white, height: 38, fontSize: 11
       });
       this.createButton("LEADERBOARD", centreX + utilityOffset, utilityY, utilityWidth, window.ChainOnline.openLeaderboard, {
-        fill: COLORS.panel, stroke: COLORS.cyan, textColor: "#22E4E0", height: 38, fontSize: 10
+        fill: COLORS.panel, stroke: COLORS.grid, textColor: COLORS.white, height: 38, fontSize: 10
       });
-      this.createButton(window.ChainOnline.accountLabel(), centreX - utilityOffset, utilityY + 58, utilityWidth, window.ChainOnline.openAccount, {
+      const utilityRowGap = veryShortHome ? 58 : 62;
+      this.createButton(window.ChainOnline.accountLabel(), centreX - utilityOffset, utilityY + utilityRowGap, utilityWidth, window.ChainOnline.openAccount, {
         fill: COLORS.panel, stroke: COLORS.grid, textColor: COLORS.white, height: 38, fontSize: 11
       });
-      this.createButton("SETTINGS", centreX + utilityOffset, utilityY + 58, utilityWidth, this.showSettings.bind(this), {
-        fill: COLORS.panel, stroke: 0x5D5A63, textColor: COLORS.white, height: 38, fontSize: 12
+      this.createButton("SETTINGS", centreX + utilityOffset, utilityY + utilityRowGap, utilityWidth, this.showSettings.bind(this), {
+        fill: COLORS.panel, stroke: COLORS.grid, textColor: COLORS.white, height: 38, fontSize: 12
       });
       if (!save.tutorialSeen && !this.tutorialActive) {
         // This opens the guide after the home screen is visible on a player's first visit.
@@ -329,7 +341,7 @@
       this.track(this.add.text(centreX, heroY, "PRACTICE", {
         fontFamily: FONTS.data, fontSize: "11px", fontStyle: "bold", color: cssToken("--accent-lime"), letterSpacing: 2
       }).setOrigin(0.5));
-      this.track(this.add.text(centreX, heroY + (compactPractice ? 30 : 34), "UNLIMITED BOARDS", {
+      this.track(this.add.text(centreX, heroY + (compactPractice ? 30 : 34), "UNLIMITED  BOARDS", {
         fontFamily: FONTS.display, fontSize: (this.scale.width < 360 ? 26 : 30) + "px", fontStyle: "bold", color: COLORS.white
       }).setOrigin(0.5));
       this.track(this.add.text(centreX, heroY + (compactPractice ? 58 : 66), "Retry, rewind, and sharpen your word finding.", {
@@ -346,6 +358,7 @@
     // This shows the current Sunday-to-Saturday Daily activity without another large panel.
     drawWeekActivity(y, save) {
       const centreX = this.scale.width / 2;
+      const compactWeek = this.scale.height < 620;
       const initials = ["S", "M", "T", "W", "T", "F", "S"];
       const today = new Date();
       const sunday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
@@ -359,13 +372,14 @@
         this.track(this.add.text(x, y, initials[index], {
           fontFamily: FONTS.ui, fontSize: "12px", fontStyle: "bold", color: played ? COLORS.white : COLORS.muted
         }).setOrigin(0.5));
-        this.track(this.add.circle(x, y + 27, 14, played ? COLORS.elevated : COLORS.panel, 1)
+        const circleY = y + (compactWeek ? 22 : 27);
+        this.track(this.add.circle(x, circleY, compactWeek ? 12 : 14, played ? COLORS.elevated : COLORS.panel, 1)
           .setStrokeStyle(1, played ? COLORS.magenta : COLORS.grid, played ? 0.8 : 0.55));
         if (played) {
-          this.track(this.add.text(x, y + 27, "🔥", { fontSize: "12px" }).setOrigin(0.5));
+          this.track(this.add.text(x, circleY, "🔥", { fontSize: (compactWeek ? 10 : 12) + "px" }).setOrigin(0.5));
         }
       }
-      this.track(this.add.text(centreX, y + 58, save.dailyResults.length + (save.dailyResults.length === 1 ? " DAY PLAYED" : " DAYS PLAYED"), {
+      this.track(this.add.text(centreX, y + (compactWeek ? 48 : 58), save.dailyResults.length + (save.dailyResults.length === 1 ? " DAY PLAYED" : " DAYS PLAYED"), {
         fontFamily: FONTS.ui, fontSize: "12px", fontStyle: "bold", color: COLORS.muted, letterSpacing: 0.8
       }).setOrigin(0.5));
     }
@@ -423,8 +437,8 @@
       this.coachingActive = true;
       const lessons = [
         {
-          label: "STEP 1 OF 3 · FIND YOUR FIRST MOVE",
-          body: "Gold is your head. Glowing outlines are safe moves. Move onto the cyan START tile, then look for a familiar word.",
+          label: "STEP 1 OF 3 · PICK YOUR FIRST LETTER",
+          body: "Tap the cyan START tile. That letter becomes the first letter of your word. After a correct word, you can choose any tile to begin the next round.",
           action: "SHOW ME"
         },
         {
@@ -434,7 +448,7 @@
         },
         {
           label: "STEP 3 OF 3 · BANK OR KEEP BUILDING",
-          body: "When your word turns gold, BANK scores it safely. Each word scores once. Find 20 unique words to unlock tomorrow, then keep going for your highest score.",
+          body: "When your word turns gold, BANK scores it. Each word scores once. An invalid word, red-trail hit, or boxed-in path costs a life. One more mistake ends the run.",
           action: "GOT IT"
         }
       ];
@@ -490,12 +504,17 @@
       this.scoreText = this.track(this.add.text(this.scale.width / 2, 25, "SCORE 0", {
         fontFamily: FONTS.data, fontSize: (this.scale.width < 360 ? 14 : 16) + "px", fontStyle: "bold", color: COLORS.white
       }).setOrigin(0.5, 0));
-      this.wordCountText = this.track(this.add.text(this.scale.width / 2, 50, "", {
-        fontFamily: FONTS.data, fontSize: "10px", fontStyle: "bold", color: "#04E7F0", letterSpacing: 1.1
-      }).setOrigin(0.5, 0));
-      this.multiplierText = this.track(this.add.text(this.scale.width - 98, 25, "×1", {
-        fontFamily: FONTS.data, fontSize: "16px", fontStyle: "bold", color: "#D4A24C"
+      this.multiplierText = this.track(this.add.text(16, 61, "MULTIPLIER  ×1", {
+        fontFamily: FONTS.data, fontSize: "10px", fontStyle: "bold", color: "#F3C866",
+        backgroundColor: "#111720", padding: { x: 7, y: 5 }, letterSpacing: 0.4
       }));
+      this.livesText = this.track(this.add.text(this.scale.width - 16, 61, "LIVES  2/2  ♥♥", {
+        fontFamily: FONTS.data, fontSize: "10px", fontStyle: "bold", color: "#FF8085",
+        backgroundColor: "#111720", padding: { x: 7, y: 5 }, letterSpacing: 0.4
+      }).setOrigin(1, 0));
+      this.wordCountText = this.track(this.add.text(this.scale.width / 2, 92, "", {
+        fontFamily: FONTS.data, fontSize: (this.scale.width < 360 ? 8 : 9) + "px", fontStyle: "bold", color: "#04E7F0", letterSpacing: 0.6
+      }).setOrigin(0.5, 0));
       this.pauseButton = this.createButton("II", this.scale.width - 28, 33, 38, this.showPause.bind(this), {
         fill: COLORS.panel, stroke: 0x77737C, textColor: COLORS.white, height: 34, fontSize: 13
       });
@@ -507,8 +526,8 @@
       }).setOrigin(0.5));
       this.feedbackUnderline = this.track(this.add.rectangle(0, 0, 170, 2, COLORS.red, 0).setOrigin(0.5));
       const actionWidth = this.currentMode === "practice"
-        ? Math.min(112, (this.scale.width - 64) / 3)
-        : Math.min(190, (this.scale.width - 60) / 2);
+        ? Math.min(180, (this.scale.width - 60) / 2)
+        : Math.min(220, this.scale.width - 64);
       this.bankButton = this.createButton("BANK", 0, 0, actionWidth, this.tryBank.bind(this), {
         fill: COLORS.tile, stroke: COLORS.tile, height: 50, fontSize: 16
       });
@@ -517,10 +536,6 @@
           fill: COLORS.panel, stroke: COLORS.cyan, textColor: "#04E7F0", height: 50, fontSize: 13
         });
       }
-      this.hintButton = this.createButton("WORD HINT · AD", 0, 0, actionWidth, this.tryRevealWord.bind(this), {
-        fill: COLORS.panel, stroke: COLORS.magenta, textColor: "#FF2E7E", height: 50,
-        fontSize: this.scale.width < 480 ? 10 : 12, disabled: !window.ChainAds.isAvailable()
-      });
     }
 
     // This computes board and HUD positions from the current browser size.
@@ -530,27 +545,25 @@
       const availableWidth = Math.min(500, width - 30);
       const availableHeight = Math.max(320, height - 245);
       this.tileSize = Math.floor(Math.min(availableWidth / 8, availableHeight / 8));
-      this.boardTop = Math.max(76, Math.floor((height - (this.tileSize * 8 + 175)) / 2) + 48);
+      this.boardTop = Math.max(116, Math.floor((height - (this.tileSize * 8 + 175)) / 2) + 48);
       this.gridStartX = (width - this.tileSize * 8) / 2 + this.tileSize / 2;
       this.gridStartY = this.boardTop + this.tileSize / 2;
       this.modeLabel.setPosition(22, 25);
       this.scoreText.setPosition(width / 2, 25);
-      this.wordCountText.setPosition(width / 2, 50);
-      this.multiplierText.setPosition(width - 98, 25);
+      this.multiplierText.setPosition(16, 61);
+      this.livesText.setPosition(width - 16, 61);
+      this.wordCountText.setPosition(width / 2, 92);
       this.pauseButton.setPosition(width - 28, 33);
       const boardBottom = this.boardTop + this.tileSize * 8;
       this.chainText.setPosition(width / 2, boardBottom + 27);
       this.feedbackText.setPosition(width / 2, boardBottom + 58);
       this.feedbackUnderline.setPosition(width / 2, boardBottom + 73);
       if (this.currentMode === "practice") {
-        const actionGap = this.bankButton.background.width + 8;
-        this.bankButton.setPosition(width / 2 - actionGap, boardBottom + 105);
-        this.rewindButton.setPosition(width / 2, boardBottom + 105);
-        this.hintButton.setPosition(width / 2 + actionGap, boardBottom + 105);
-      } else {
         const actionOffset = (this.bankButton.background.width + 12) / 2;
         this.bankButton.setPosition(width / 2 - actionOffset, boardBottom + 105);
-        this.hintButton.setPosition(width / 2 + actionOffset, boardBottom + 105);
+        this.rewindButton.setPosition(width / 2 + actionOffset, boardBottom + 105);
+      } else {
+        this.bankButton.setPosition(width / 2, boardBottom + 105);
       }
     }
 
@@ -569,26 +582,24 @@
           const x = this.gridStartX + column * this.tileSize;
           const y = this.gridStartY + row * this.tileSize;
           const isBody = cell.state === "BODY";
+          const starter = this.board.awaitingStart && this.board.starterPath && this.board.starterPath[0];
+          const isStartChoice = this.board.awaitingStart && (this.board.startMode === "free" || (starter && starter.row === row && starter.column === column));
           const plate = this.add.rectangle(x, y, this.tileSize - 5, this.tileSize - 5, isBody ? COLORS.body : COLORS.tile, 0.98)
-            .setStrokeStyle(isBody ? 2 : 1, isBody ? 0xFF6B70 : COLORS.cyan, isBody ? 0.95 : 0.24)
+            .setStrokeStyle(isBody || isStartChoice ? 2 : 1, isBody ? 0xFF6B70 : (isStartChoice ? COLORS.green : COLORS.cyan), isBody ? 0.95 : (isStartChoice ? 0.9 : 0.24))
             .setDepth(0);
           this.track(plate, this.boardObjects);
           if (cell.state === "LETTER") {
             plate.setInteractive({ useHandCursor: true });
             plate.on("pointerup", this.handleTileTap.bind(this, row, column));
           }
-          let letter = null;
-          if (cell.state !== "HEAD") {
-            letter = this.add.text(x, y + 1, cell.letter, {
-              fontFamily: FONTS.ui,
-              fontSize: Math.max(18, Math.floor(this.tileSize * 0.42)) + "px",
-              fontStyle: "bold",
-              color: isBody ? "#F2EDE4" : COLORS.ink
-            }).setOrigin(0.5).setDepth(2);
-            this.track(letter, this.boardObjects);
-          }
-          const starter = this.board.chain.length === 0 && this.board.starterPath && this.board.starterPath[0];
-          if (starter && starter.row === row && starter.column === column) {
+          const letter = this.add.text(x, y + 1, cell.letter, {
+            fontFamily: FONTS.ui,
+            fontSize: Math.max(18, Math.floor(this.tileSize * 0.42)) + "px",
+            fontStyle: "bold",
+            color: isBody ? "#F2EDE4" : COLORS.ink
+          }).setOrigin(0.5).setDepth(cell.state === "HEAD" ? 7 : 2);
+          this.track(letter, this.boardObjects);
+          if (this.board.awaitingStart && this.board.startMode === "guided" && starter && starter.row === row && starter.column === column) {
             const startTag = this.add.text(x, y - this.tileSize * 0.31, "START", {
               fontFamily: FONTS.data, fontSize: Math.max(8, Math.floor(this.tileSize * 0.13)) + "px",
               fontStyle: "bold", color: "#00757A", backgroundColor: "#C8FFFF", padding: { x: 3, y: 1 }
@@ -596,7 +607,7 @@
             this.track(startTag, this.boardObjects);
           }
           if (refillKeys.has(row + ":" + column)) {
-            const delay = refillIndex * 20;
+            const delay = refillIndex * 4;
             refillIndex += 1;
             plate.setY(y - 24).setAlpha(0);
             if (letter) {
@@ -608,15 +619,16 @@
       }
       this.snake.render(this.board, moveResult);
       this.scoreText.setText("SCORE " + this.board.score.toLocaleString("en-US"));
-      this.multiplierText.setText("×" + window.ChainWords.getChainMultiplier(this.board.bankStreak));
+      this.multiplierText.setText("MULTIPLIER  ×" + window.ChainWords.getChainMultiplier(this.board.bankStreak));
+      this.livesText.setText("LIVES  " + this.board.lives + "/2  " + "♥".repeat(this.board.lives) + "♡".repeat(Math.max(0, 2 - this.board.lives)));
       if (this.currentMode === "daily") {
         const found = this.board.wordsFound.length;
         this.wordCountText.setText(found >= window.ChainState.dailyTarget
-          ? "TOMORROW UNLOCKED"
-          : found + "/" + window.ChainState.dailyTarget + " WORDS TO UNLOCK TOMORROW");
+          ? "20 WORDS CORRECT · TOMORROW'S BOARD UNLOCKED"
+          : "GET 20 WORDS CORRECT AND PROGRESS TO TOMORROW'S BOARD");
         this.wordCountText.setColor(found >= window.ChainState.dailyTarget ? "#69F23B" : "#04E7F0");
       } else {
-        this.wordCountText.setText(this.startingWordCount + " REACHABLE WORD" + (this.startingWordCount === 1 ? "" : "S") + " AT THE START");
+        this.wordCountText.setText("PRACTICE  THE  DAILY  RULES  ·  TWO  LIVES");
       }
     }
 
@@ -629,13 +641,21 @@
         letters.push("_");
       }
       this.chainText.setText(letters.join(" "));
-      this.feedbackText.setText(temporaryMessage || (duplicateWord ? "×  Already banked. Each word scores once." : (evaluation.icon + "  " + evaluation.text)));
+      const startMessage = this.board.startMode === "free"
+        ? "Tap any tile to choose the first letter of your next word."
+        : "Tap the START tile. Its letter begins your word.";
+      this.feedbackText.setText(temporaryMessage || (this.board.awaitingStart ? startMessage : (duplicateWord ? "×  Already banked. Each word scores once." : (evaluation.icon + "  " + evaluation.text))));
       this.feedbackUnderline.setAlpha(evaluation.state === "DEAD" || duplicateWord ? 0.75 : 0);
       if (this.feedbackTween) {
         this.feedbackTween.stop();
         this.feedbackTween = null;
       }
-      if (evaluation.state === "DEAD" || duplicateWord) {
+      if (this.board.awaitingStart) {
+        this.chainText.setColor(COLORS.white);
+        this.feedbackText.setColor("#69F23B");
+        this.bankButton.background.setFillStyle(COLORS.panel);
+        this.bankButton.label.setColor(COLORS.muted);
+      } else if (evaluation.state === "DEAD" || duplicateWord) {
         this.chainText.setColor("#77737C");
         this.feedbackText.setColor("#C46B61");
         this.bankButton.background.setFillStyle(COLORS.panel);
@@ -654,12 +674,17 @@
         this.feedbackTween = this.tweens.add({ targets: this.chainText, alpha: 0.82, duration: 750, yoyo: true, repeat: -1 });
       }
       this.scoreText.setText("SCORE " + this.board.score.toLocaleString("en-US"));
-      this.multiplierText.setText("×" + window.ChainWords.getChainMultiplier(this.board.bankStreak));
+      this.multiplierText.setText("MULTIPLIER  ×" + window.ChainWords.getChainMultiplier(this.board.bankStreak));
+      this.livesText.setText("LIVES  " + this.board.lives + "/2  " + "♥".repeat(this.board.lives) + "♡".repeat(Math.max(0, 2 - this.board.lives)));
     }
 
     // This turns arrows, WASD, SPACE, BACKSPACE, R, and ESCAPE into discrete game actions.
     handleKeyDown(event) {
-      if (event.repeat || this.screen !== "game" || this.coachingActive) {
+      const target = event.target;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      if (event.repeat || this.screen !== "game" || this.coachingActive || this.lifeWarningActive) {
         return;
       }
       if (event.keyCode === Phaser.Input.Keyboard.KeyCodes.ESC) {
@@ -669,6 +694,7 @@
       } else if (event.keyCode === Phaser.Input.Keyboard.KeyCodes.R) {
         this.tryRewind();
       } else if (event.keyCode === Phaser.Input.Keyboard.KeyCodes.BACKSPACE) {
+        event.preventDefault();
         this.tryStepBack();
       } else if (event.keyCode === Phaser.Input.Keyboard.KeyCodes.UP || event.keyCode === Phaser.Input.Keyboard.KeyCodes.W) {
         this.tryMove(-1, 0);
@@ -711,6 +737,20 @@
       if (!pointer || pointer.getDistance() > 12 || this.screen !== "game") {
         return;
       }
+      if (this.board.awaitingStart) {
+        this.preMoveState = this.board.exportState();
+        const startResult = this.board.selectStart(row, column);
+        if (!startResult.selected) {
+          this.updateChainFeedback(this.board.startMode === "guided" ? "×  Begin on the tile marked START." : "×  Choose a fresh letter tile.");
+          return;
+        }
+        this.renderBoard();
+        this.updateChainFeedback("◆  " + startResult.letter + " is your first letter. Build from here.");
+        if (this.currentMode === "daily") {
+          window.ChainState.saveDailyProgress(this.board);
+        }
+        return;
+      }
       const rowChange = row - this.board.head.row;
       const columnChange = column - this.board.head.column;
       if (Math.abs(rowChange) + Math.abs(columnChange) === 1) {
@@ -736,17 +776,78 @@
       oscillator.stop(this.audioContext.currentTime + 0.1);
     }
 
-    // This lets Practice use BACKSPACE as rewind while Daily treats reversing into the trail as fatal.
+    // This applies one mistake consistently, redraws the reset board, and pauses for a clear one-life warning.
+    applyMistake(reason, existingResult) {
+      const result = existingResult || this.board.loseLife(reason);
+      this.playSound("blocked");
+      this.renderBoard();
+      const shortReason = reason === "red-trail"
+        ? "You stepped back into your red trail."
+        : (reason === "boxed-in" ? "You ran out of safe moves." : "That was not a valid word.");
+      this.updateChainFeedback(result.dead
+        ? "×  " + shortReason + " Both lives are gone."
+        : "♥  " + shortReason + " One life remains.");
+      if (this.currentMode === "daily") {
+        window.ChainState.saveDailyProgress(this.board);
+      }
+      if (result.dead) {
+        this.beginDeath("lives");
+        return;
+      }
+      this.showLifeWarning(shortReason);
+    }
+
+    // This makes the first lost life impossible to miss and explains the permanent free-start penalty.
+    showLifeWarning(reasonCopy) {
+      this.lifeWarningActive = true;
+      this.animating = true;
+      this.inputQueue = [];
+      const width = this.scale.width;
+      const height = this.scale.height;
+      const panelWidth = Math.min(420, width - 40);
+      const shade = this.add.rectangle(width / 2, height / 2, width, height, COLORS.background, 0.9).setDepth(44).setInteractive();
+      const panel = this.add.rectangle(width / 2, height / 2, panelWidth, 360, COLORS.panel, 1)
+        .setStrokeStyle(2, COLORS.red, 0.92).setDepth(45);
+      this.track(shade, this.overlayObjects);
+      this.track(panel, this.overlayObjects);
+      this.track(this.add.text(width / 2, height / 2 - 126, "ONE  LIFE  LEFT", {
+        fontFamily: FONTS.display, fontSize: "28px", fontStyle: "bold", color: COLORS.white, letterSpacing: 0.6
+      }).setOrigin(0.5).setDepth(46), this.overlayObjects);
+      this.track(this.add.text(width / 2, height / 2 - 82, "♥  ♡", {
+        fontFamily: FONTS.data, fontSize: "24px", fontStyle: "bold", color: "#FF8085", letterSpacing: 4
+      }).setOrigin(0.5).setDepth(46), this.overlayObjects);
+      this.track(this.add.text(width / 2, height / 2 - 45, reasonCopy + "\n\nFree-start choices are now gone. CHAIN will pick each new starting letter for the rest of this run. One more mistake ends the run.", {
+        fontFamily: FONTS.ui, fontSize: "14px", color: "#D7E6F3", align: "center",
+        lineSpacing: 5, wordWrap: { width: panelWidth - 54 }
+      }).setOrigin(0.5, 0).setDepth(46), this.overlayObjects);
+      this.createButton("KEEP PLAYING", width / 2, height / 2 + 128, panelWidth - 64, this.dismissLifeWarning.bind(this), {
+        fill: COLORS.magenta, stroke: COLORS.magenta, height: 50, fontSize: 14, depth: 46, group: this.overlayObjects
+      });
+    }
+
+    // This returns to the automatically selected new round after the player reads the warning.
+    dismissLifeWarning() {
+      this.destroyGroup(this.overlayObjects);
+      this.lifeWarningActive = false;
+      this.animating = false;
+      this.updateChainFeedback("♥  One life left. Your starting letter is now chosen automatically.");
+    }
+
+    // This lets Practice use BACKSPACE as rewind while Daily applies the same two-life rule as a red-trail hit.
     tryStepBack() {
       if (!this.board) {
+        return;
+      }
+      if (this.board.awaitingStart) {
+        this.updateChainFeedback("Choose your first tile before moving.");
         return;
       }
       if (this.currentMode === "practice") {
         this.tryRewind();
         return;
       }
-      this.updateChainFeedback("×  You reversed into your red trail. Run over.");
-      this.beginDeath("trail");
+      this.preMoveState = this.board.exportState();
+      this.applyMistake("red-trail");
     }
 
     // This performs one move, shows blocked feedback, saves Daily, and checks for a fair death.
@@ -758,6 +859,10 @@
         this.inputQueue.push({ type: "move", row: rowChange, column: columnChange });
         return;
       }
+      if (this.board.awaitingStart) {
+        this.updateChainFeedback(this.board.startMode === "free" ? "Tap any tile to choose your start." : "Tap the tile marked START first.");
+        return;
+      }
       this.preMoveState = this.board.exportState();
       const result = this.board.move(rowChange, columnChange);
       if (!result.moved) {
@@ -765,8 +870,7 @@
         this.snake.blockedFeedback(result.target, this.board);
         const state = this.board.getCell(result.target.row, result.target.column);
         if (state && state.state === "BODY") {
-          this.updateChainFeedback("×  You hit your red trail. Run over.");
-          this.beginDeath("trail");
+          this.applyMistake("red-trail");
         } else {
           this.updateChainFeedback("×  The grid ends there. Use an outlined tile.");
         }
@@ -787,7 +891,8 @@
         window.ChainState.saveDailyProgress(this.board);
       }
       if (this.board.isDead()) {
-        this.beginDeath("boxed-in");
+        this.preMoveState = this.board.exportState();
+        this.applyMistake("boxed-in");
       }
     }
 
@@ -800,16 +905,14 @@
         this.inputQueue.push({ type: "bank" });
         return;
       }
+      if (this.board.awaitingStart) {
+        this.updateChainFeedback(this.board.startMode === "free" ? "Choose a start tile before banking." : "Tap the START tile before banking.");
+        return;
+      }
       if (!window.ChainWords.isWord(this.board.chain)) {
-        this.board.bank();
-        this.updateChainFeedback("×  Not a word yet. Try another path.");
-        this.tweens.add({ targets: this.chainText, x: this.chainText.x + 6, duration: 45, yoyo: true, repeat: 2 });
-        if (this.currentMode === "daily") {
-          window.ChainState.saveDailyProgress(this.board);
-        }
-        if (this.board.isDead()) {
-          this.beginDeath("boxed-in");
-        }
+        this.preMoveState = this.board.exportState();
+        const invalidResult = this.board.bank();
+        this.applyMistake("invalid-word", invalidResult);
         return;
       }
       if (this.board.hasBankedWord(this.board.chain)) {
@@ -835,7 +938,7 @@
       const result = this.board.bank();
       this.playSound("success");
       this.renderBoard(null, result.refilled);
-      this.updateChainFeedback("◆  " + result.word + " banked for " + result.points + " points");
+      this.updateChainFeedback("◆  " + result.word + " banked for " + result.points + " points. Choose your next start.");
       if (this.currentMode === "daily" && this.board.wordsFound.length === window.ChainState.dailyTarget) {
         this.showRarityToast("TOMORROW UNLOCKED");
       }
@@ -844,6 +947,7 @@
       }
       if (this.currentMode === "daily") {
         window.ChainState.saveDailyProgress(this.board);
+        window.ChainOnline.submitBoardScore(this.board);
       }
       // This waits only for the visible drop to settle before processing the next queued action.
       this.time.delayedCall(240, this.releaseInputQueue, [], this);
@@ -939,7 +1043,7 @@
       }
       this.runEnded = true;
       this.animating = true;
-      this.deathReason = reason === "trail" ? "trail" : "boxed-in";
+      this.deathReason = reason === "trail" ? "trail" : (reason === "lives" ? "lives" : "boxed-in");
       this.deathRestoreState = this.preMoveState || this.board.exportState();
       const usedWords = this.board.wordsFound.map(function collectUsedWord(entry) { return entry.word; });
       const solution = window.ChainWords.solve(this.board.grid, this.board.head, { includeBody: true, excludeWords: usedWords });
@@ -959,11 +1063,11 @@
       const panelWidth = Math.min(420, width - 48);
       const reasonCopy = this.deathReason === "trail"
         ? "You touched your red trail. Red tiles are always fatal."
-        : "No fresh move or bankable word remained.";
+        : (this.deathReason === "lives" ? "Two mistakes used both of your lives." : "No fresh move or bankable word remained.");
       this.track(this.add.rectangle(width / 2, height / 2, width, height, COLORS.background, 0.9).setDepth(40), this.overlayObjects);
       this.track(this.add.rectangle(width / 2, height / 2, panelWidth, 330, COLORS.panel, 1)
         .setStrokeStyle(2, COLORS.magenta, 0.9).setDepth(41), this.overlayObjects);
-      this.track(this.add.text(width / 2, height / 2 - 116, "RUN OVER", {
+      this.track(this.add.text(width / 2, height / 2 - 116, "RUN  OVER", {
         fontFamily: FONTS.display, fontSize: "32px", fontStyle: "bold", color: COLORS.white
       }).setOrigin(0.5).setDepth(42), this.overlayObjects);
       this.track(this.add.text(width / 2, height / 2 - 68, reasonCopy, {
@@ -1039,8 +1143,8 @@
       const qualified = this.currentMode === "daily" && this.board.wordsFound.length >= window.ChainState.dailyTarget;
       const summaryTitle = this.currentMode === "daily"
         ? (qualified ? "TOMORROW UNLOCKED" : "DAILY FAILED")
-        : (this.deathReason === "trail" ? "TRAIL HIT" : "BOXED IN");
-      this.track(this.add.text(width / 2, top, summaryTitle, {
+        : (this.deathReason === "trail" ? "TRAIL HIT" : (this.deathReason === "lives" ? "OUT OF LIVES" : "BOXED IN"));
+      this.track(this.add.text(width / 2, top, summaryTitle.replace(/ +/g, "  "), {
         fontFamily: FONTS.display, fontSize: (width < 480 ? 26 : 34) + "px", fontStyle: "bold", color: COLORS.white
       }).setOrigin(0.5).setDepth(32), this.overlayObjects);
       if (this.currentMode === "daily") {
@@ -1051,7 +1155,7 @@
           color: qualified ? "#69F23B" : "#FF8085", letterSpacing: 1
         }).setOrigin(0.5).setDepth(32), this.overlayObjects);
       }
-      this.track(this.add.text(width / 2, top + 46, "FINAL SCORE  " + this.board.score.toLocaleString("en-US"), {
+      this.track(this.add.text(width / 2, top + 46, "FINAL  SCORE  " + this.board.score.toLocaleString("en-US"), {
         fontFamily: FONTS.data, fontSize: "18px", fontStyle: "bold", color: "#D4A24C"
       }).setOrigin(0.5).setDepth(32), this.overlayObjects);
       let framing = "A new personal best.";
@@ -1148,7 +1252,7 @@
       this.tweens.add({ targets: notice, alpha: 0, duration: 900, delay: 550 });
     }
 
-    // This opens the gameplay pause layer with safe mode switching and Practice retry.
+    // This opens a focused gameplay pause layer with only actions that belong to the current run.
     showPause() {
       if (this.screen !== "game" || this.animating || this.runEnded) {
         return;
@@ -1156,43 +1260,23 @@
       this.screen = "pause";
       const width = this.scale.width;
       const height = this.scale.height;
+      const practicePause = this.currentMode === "practice";
+      const panelHeight = practicePause ? 300 : 238;
       this.track(this.add.rectangle(width / 2, height / 2, width, height, COLORS.background, 0.88).setDepth(40), this.overlayObjects);
-      this.track(this.add.rectangle(width / 2, height / 2, Math.min(460, width - 32), 330, COLORS.panel, 0.98).setStrokeStyle(2, COLORS.cyan, 0.6).setDepth(41), this.overlayObjects);
-      this.track(this.add.text(width / 2, height / 2 - 118, "RUN PAUSED", {
-        fontFamily: FONTS.display, fontSize: "28px", fontStyle: "bold", color: COLORS.white
+      this.track(this.add.rectangle(width / 2, height / 2, Math.min(460, width - 32), panelHeight, COLORS.panel, 0.98).setStrokeStyle(1, COLORS.grid, 0.9).setDepth(41), this.overlayObjects);
+      this.track(this.add.text(width / 2, height / 2 - (practicePause ? 106 : 78), "RUN  PAUSED", {
+        fontFamily: FONTS.display, fontSize: "28px", fontStyle: "bold", color: COLORS.white, letterSpacing: 0.6
       }).setOrigin(0.5).setDepth(42), this.overlayObjects);
-      this.createModeSwitcherInPause(height / 2 - 66);
-      this.createButton("RESUME", width / 2, height / 2 + 5, 260, this.closePause.bind(this), {
+      this.createButton("RESUME", width / 2, height / 2 - (practicePause ? 40 : 14), 260, this.closePause.bind(this), {
         fill: COLORS.cyan, stroke: COLORS.cyan, height: 46, fontSize: 14, depth: 42, group: this.overlayObjects
       });
-      if (this.currentMode === "practice") {
-        this.createButton("RETRY THIS BOARD", width / 2, height / 2 + 62, 260, this.startPractice.bind(this, this.initialSeed, this.runLabel), {
+      if (practicePause) {
+        this.createButton("RETRY THIS BOARD", width / 2, height / 2 + 24, 260, this.startPractice.bind(this, this.initialSeed, this.runLabel), {
           fill: COLORS.panel, stroke: COLORS.magenta, textColor: "#FF168B", height: 42, fontSize: 12, depth: 42, group: this.overlayObjects
         });
       }
-      this.createButton("HOME", width / 2, height / 2 + 118, 180, this.confirmLeaveRun.bind(this, this.currentMode), {
-        fill: COLORS.panel, stroke: 0x77737C, textColor: COLORS.white, height: 38, fontSize: 12, depth: 42, group: this.overlayObjects
-      });
-    }
-
-    // This draws Daily and Practice inside pause so accidental mode taps cannot happen during play.
-    createModeSwitcherInPause(y) {
-      const width = Math.min(330, this.scale.width - 70);
-      const segment = width / 2;
-      const centreX = this.scale.width / 2;
-      this.createButton("DAILY", centreX - segment / 2, y, segment, this.confirmLeaveRun.bind(this, "daily"), {
-        fill: this.currentMode === "daily" ? COLORS.cyan : COLORS.panel,
-        stroke: COLORS.cyan,
-        textColor: this.currentMode === "daily" ? "#041019" : "#04E7F0",
-        height: 38, fontSize: 12, depth: 42, group: this.overlayObjects,
-        disabled: this.currentMode === "daily"
-      });
-      this.createButton("PRACTICE", centreX + segment / 2, y, segment, this.confirmLeaveRun.bind(this, "practice"), {
-        fill: this.currentMode === "practice" ? COLORS.magenta : COLORS.panel,
-        stroke: COLORS.magenta,
-        textColor: this.currentMode === "practice" ? "#041019" : "#FF168B",
-        height: 38, fontSize: 12, depth: 42, group: this.overlayObjects,
-        disabled: this.currentMode === "practice"
+      this.createButton("HOME", width / 2, height / 2 + (practicePause ? 88 : 54), 180, this.confirmLeaveRun.bind(this, this.currentMode), {
+        fill: COLORS.panel, stroke: COLORS.grid, textColor: COLORS.white, height: 38, fontSize: 12, depth: 42, group: this.overlayObjects
       });
     }
 
@@ -1244,7 +1328,7 @@
       const card = this.add.rectangle(centreX, centreY, cardWidth, 126, 0x07111E, 1)
         .setStrokeStyle(1, index === 2 || index === 4 ? COLORS.red : COLORS.cyan, 0.72).setDepth(72);
       this.track(card, this.overlayObjects);
-      this.track(this.add.text(centreX - cardWidth / 2 + 14, centreY - 50, "BOARD EXAMPLE", {
+      this.track(this.add.text(centreX - cardWidth / 2 + 14, centreY - 50, "BOARD  EXAMPLE", {
         fontFamily: FONTS.data, fontSize: "9px", fontStyle: "bold", color: "#69F23B", letterSpacing: 1.5
       }).setDepth(73), this.overlayObjects);
 
@@ -1255,7 +1339,7 @@
         this.track(this.add.text(centreX, centreY + 11, "SCORE  2,840", {
           fontFamily: FONTS.data, fontSize: "24px", fontStyle: "bold", color: COLORS.white
         }).setOrigin(0.5).setDepth(73), this.overlayObjects);
-        this.track(this.add.text(centreX, centreY + 40, "27 REACHABLE WORDS AT THE START", {
+        this.track(this.add.text(centreX, centreY + 40, "GET 20 WORDS · UNLOCK TOMORROW", {
           fontFamily: FONTS.data, fontSize: "10px", fontStyle: "bold", color: "#69F23B", letterSpacing: 1
         }).setOrigin(0.5).setDepth(73), this.overlayObjects);
         return;
@@ -1299,17 +1383,17 @@
         {
           label: "THE IDEA",
           title: "SCRABBLE MEETS SNAKE",
-          body: "Move one tile at a time to spell words. Every letter grows your red trail. Bank a valid word to score it. A banked word is gone for that run, so every word scores only once."
+          body: "Tap START to choose the first letter, then move one tile at a time. Every move grows your red trail. Bank a valid word to score it. Each word can score only once per run."
         },
         {
           label: "THE DAILY GOAL",
           title: "FIND 20, THEN AIM HIGH",
-          body: "Bank 20 unique words to unlock tomorrow's challenge. Every Daily begins with at least 20 reachable words, but 20 is never the maximum. Once qualified, keep playing for the highest score you can."
+          body: "Bank 20 unique words to unlock tomorrow's challenge, then keep playing for the day's highest score. Every new round gets a fresh board and a different planted opening word."
         },
         {
           label: "THE BOARD",
-          title: "FOLLOW START, THEN THINK AHEAD",
-          body: "START points toward an easy first word in Practice. Outlined tiles are safe moves. Red tiles are your used path, so stepping into an older red tile ends the run. Finish below 20 and today's Daily fails."
+          title: "CHOOSE, BUILD, THEN SURVIVE",
+          body: "After a correct word, choose any tile as your next start. Your first invalid word, red-trail hit, or boxed-in path costs one life and removes free starts. A second mistake ends the run."
         }
       ];
       const index = Phaser.Math.Clamp(Number(page) || 0, 0, steps.length - 1);
@@ -1337,7 +1421,7 @@
       this.track(this.add.text(width / 2, height / 2 + labelOffset, step.label, {
         fontFamily: FONTS.data, fontSize: "11px", fontStyle: "bold", color: cssToken("--accent-cyan"), letterSpacing: 2
       }).setOrigin(0.5).setDepth(72), this.overlayObjects);
-      this.track(this.add.text(width / 2, height / 2 + titleOffset, step.title, {
+      this.track(this.add.text(width / 2, height / 2 + titleOffset, step.title.replace(/ +/g, "  "), {
         fontFamily: FONTS.display, fontSize: Math.min(27, Math.max(20, width * 0.052)) + "px",
         fontStyle: "bold", color: COLORS.white, align: "center", wordWrap: { width: panelWidth - 54 }
       }).setOrigin(0.5).setDepth(72), this.overlayObjects);
@@ -1389,7 +1473,7 @@
       this.currentMode = "practice";
       const width = this.scale.width;
       const centreX = width / 2;
-      this.track(this.add.text(centreX, 54, "DAILY ARCHIVE", {
+      this.track(this.add.text(centreX, 54, "DAILY  ARCHIVE", {
         fontFamily: FONTS.display, fontSize: "34px", fontStyle: "bold", color: COLORS.white
       }).setOrigin(0.5));
       this.createModeSwitcher("practice", 105);

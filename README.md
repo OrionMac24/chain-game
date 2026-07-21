@@ -5,13 +5,14 @@ CHAIN is a daily word-snake game. Players move across one shared board, spell an
 ## What is included
 
 - Responsive browser game with Daily and unlimited Practice modes
-- Guided visual tutorial and beginner-friendly opening words
+- Guided visual tutorial, a marked first letter, and beginner-friendly opening words
 - Deterministic 8 by 8 boards using a weighted letter bag
 - At least 20 distinct reachable opening words, minimum 16 vowels, and no more than one total Q, J, X, or Z per board
+- A fresh board after every correct word, plus one free start choice at the beginning of each new round
 - One score per unique word, with 20 banked words required to unlock the next Daily
-- Fatal red-trail collisions, boxed-in deaths, one rewarded revive, and rewarded word hints
+- Two lives across invalid words, red-trail hits, and boxed-in paths, plus loss of free starts after the first mistake
 - Retina-density rendering, compact-phone layouts, and an intentional portrait-phone experience
-- Supabase email accounts, native iOS Apple sign-in, usernames, account deletion, and live leaderboard
+- Supabase email accounts, usernames, account deletion, and live leaderboard
 - RevenueCat Paywall, Chain Pro entitlement checks, restore, and Customer Center
 - Google rewarded ads with consent flows for iOS and Android
 - Native SwiftUI iOS and Android WebView wrappers
@@ -47,7 +48,7 @@ The iOS project is generated from `ios/ChainIOS/project.yml` with XcodeGen.
 
 ## Backend
 
-Run `supabase/schema.sql` once in the Supabase SQL Editor. The same SQL is also stored as a timestamped migration under `supabase/migrations` for a GitHub or Supabase CLI workflow.
+For a fresh project, run `supabase/schema.sql` once in the Supabase SQL Editor. For the existing CHAIN project, run `supabase/migrations/202607210002_auth_realtime_fixes.sql` to add profile repair and reliable live score submission without changing the existing keys.
 
 ## Release setup
 

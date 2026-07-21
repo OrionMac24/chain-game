@@ -174,7 +174,7 @@ body {
   width: min(100%, var(--content-max));
   max-height: min(720px, 90dvh);
   overflow: auto;
-  border: var(--border-active);
+  border: var(--border-subtle);
   border-radius: var(--r-md);
   padding: 40px 24px 24px;
   background: var(--bg-panel);
@@ -312,7 +312,14 @@ body {
 }
 
 .leaderboard-list li.is-you {
-  border-color: var(--accent-cyan);
+  border-color: var(--accent-lime);
+}
+
+.leaderboard-live {
+  margin: -8px 0 14px !important;
+  color: var(--accent-lime) !important;
+  font: 500 10px/1.2 "Geist Mono", monospace !important;
+  letter-spacing: 0.12em;
 }
 
 .leaderboard-list li > span,

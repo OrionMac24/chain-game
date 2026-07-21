@@ -211,6 +211,9 @@
     // This redraws every snake layer after the board changes while keeping letters above the rope.
     render(board, moveResult) {
       this.clear();
+      if (board.awaitingStart) {
+        return;
+      }
       this.drawHatches(board);
       this.drawRope(board);
       this.drawLegalMoves(board);

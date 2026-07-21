@@ -21,8 +21,6 @@ targets:
       SystemCapabilities:
         com.apple.InAppPurchase:
           enabled: 1
-        com.apple.SignInWithApple:
-          enabled: 1
     sources:
       - path: ChainIOS
         excludes:

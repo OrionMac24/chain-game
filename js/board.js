@@ -67,9 +67,16 @@
         this.bankStreak = 0;
         this.rejectedBanks = 0;
         this.reviveUsed = false;
+        this.lives = 2;
+        this.freeStartEnabled = true;
+        this.awaitingStart = false;
+        this.startMode = "guided";
+        this.roundsCompleted = 0;
         this.starterPath = [];
         this.starterWord = "";
+        this.lastStarterWord = "";
         this.generateVerifiedBoard();
+        this.prepareStart("guided");
       }
     }
 
@@ -141,6 +148,50 @@
       throw new Error("CHAIN could not create a Daily board with 20 distinct opening words.");
     }
 
+    // This pauses a fresh round before its first letter and exposes either one guided start or every tile.
+    prepareStart(mode) {
+      const currentHead = this.getCell(this.head.row, this.head.column);
+      if (currentHead && currentHead.state === "HEAD") {
+        currentHead.state = "LETTER";
+      }
+      this.bodyOrder = [];
+      this.chain = "";
+      this.awaitingStart = true;
+      this.startMode = mode === "free" ? "free" : "guided";
+    }
+
+    // This makes the chosen tile the visible first letter, then locks the start for the rest of the round.
+    selectStart(row, column, rememberSelection) {
+      if (!this.awaitingStart) {
+        return { selected: false };
+      }
+      const cell = this.getCell(row, column);
+      const required = this.starterPath && this.starterPath[0];
+      if (!cell || cell.state !== "LETTER" || (this.startMode === "guided" && (!required || required.row !== row || required.column !== column))) {
+        return { selected: false };
+      }
+      if (rememberSelection !== false) {
+        this.remember("start");
+      }
+      this.head = { row: row, column: column };
+      cell.state = "HEAD";
+      this.chain = cell.letter;
+      this.bodyOrder = [];
+      this.awaitingStart = false;
+      const usedFriendlyStart = required && required.row === row && required.column === column;
+      if (!usedFriendlyStart) {
+        this.starterPath = [];
+        this.starterWord = "";
+      }
+      return { selected: true, letter: cell.letter, point: copyData(this.head), guided: this.startMode === "guided" };
+    }
+
+    // This chooses the planted beginner route automatically after the free-start privilege has been lost.
+    selectGuidedStart() {
+      const required = this.starterPath && this.starterPath[0];
+      return required ? this.selectStart(required.row, required.column, false) : { selected: false };
+    }
+
     // This installs a reachable four-letter word only after random generation cannot provide one.
     forceSolvablePath() {
       this.enforceLetterConstraints(20);
@@ -154,7 +205,7 @@
       let word = FRIENDLY_WORDS[startIndex];
       for (let offset = 0; offset < FRIENDLY_WORDS.length; offset += 1) {
         const candidate = FRIENDLY_WORDS[(startIndex + offset) % FRIENDLY_WORDS.length];
-        if (!this.hasBankedWord(candidate)) {
+        if (!this.hasBankedWord(candidate) && candidate !== this.lastStarterWord) {
           word = candidate;
           break;
         }
@@ -162,6 +213,7 @@
       const path = this.installWord(word);
       this.starterPath = path;
       this.starterWord = word;
+      this.lastStarterWord = word;
       return path;
     }
 
@@ -325,7 +377,7 @@
 
     // This checks whether a forward move enters an adjacent unused letter before the chain reaches nine.
     canMove(rowChange, columnChange) {
-      if (this.chain.length >= 9) {
+      if (this.awaitingStart || this.chain.length >= 9) {
         return false;
       }
       const destination = this.getCell(this.head.row + rowChange, this.head.column + columnChange);
@@ -386,19 +438,41 @@
 
     // This declares death only when no fresh tile and no new valid bank can save the current run.
     isDead() {
-      return this.getLegalMoves().length === 0 && (!window.ChainWords.isWord(this.chain) || this.hasBankedWord(this.chain));
+      return !this.awaitingStart && this.getLegalMoves().length === 0 && (!window.ChainWords.isWord(this.chain) || this.hasBankedWord(this.chain));
     }
 
-    // This scores a valid word, clears the body, refills it, and records the word for the summary.
+    // This applies the shared two-life rule to invalid words and red-trail collisions.
+    loseLife(reason) {
+      this.bankStreak = 0;
+      this.rejectedBanks += 1;
+      this.lives = Math.max(0, this.lives - 1);
+      this.freeStartEnabled = false;
+      if (this.lives === 0) {
+        return { lifeLost: true, lives: 0, dead: true, reason: reason || "mistake" };
+      }
+      this.generateVerifiedBoard();
+      this.prepareStart("guided");
+      this.selectGuidedStart();
+      return {
+        lifeLost: true,
+        lives: this.lives,
+        dead: false,
+        boardReset: true,
+        reason: reason || "mistake"
+      };
+    }
+
+    // This spends a life on an invalid guess or scores a valid word and opens a completely fresh round.
     bank() {
-      if (!window.ChainWords.isWord(this.chain)) {
-        this.bankStreak = 0;
-        this.rejectedBanks += 1;
-        return { banked: false };
+      if (this.awaitingStart) {
+        return { banked: false, awaitingStart: true };
       }
       if (this.hasBankedWord(this.chain)) {
         this.rejectedBanks += 1;
         return { banked: false, duplicate: true, word: this.chain };
+      }
+      if (!window.ChainWords.isWord(this.chain)) {
+        return Object.assign({ banked: false }, this.loseLife("invalid-word"));
       }
       this.remember("bank");
       const word = this.chain;
@@ -409,33 +483,29 @@
       this.score += points;
       this.bankStreak = nextStreak;
       this.wordsFound.push({ word: word, points: points, rarity: rarity });
+      this.roundsCompleted += 1;
       const refilled = [];
       for (let row = 0; row < SIZE; row += 1) {
         for (let column = 0; column < SIZE; column += 1) {
-          const cell = this.grid[row][column];
-          if (cell.state === "BODY") {
-            cell.state = "LETTER";
-            cell.letter = this.drawLetter();
-            refilled.push({ row: row, column: column });
-          }
+          refilled.push({ row: row, column: column });
         }
       }
-      this.bodyOrder = [];
-      this.chain = "";
-      this.enforceLetterConstraints();
-      if (this.wordsFound.length < 3) {
-        this.installFriendlyWord();
-        this.enforceLetterConstraints();
+      this.generateVerifiedBoard();
+      if (this.freeStartEnabled) {
+        this.prepareStart("free");
       } else {
-        this.starterPath = [];
-        this.starterWord = "";
+        this.prepareStart("guided");
+        this.selectGuidedStart();
       }
-      const usedWords = this.wordsFound.map(function collectUsedWord(entry) { return entry.word; });
-      const best = window.ChainWords.solve(this.grid, this.head, { includeBody: false, minLength: 4, excludeWords: usedWords });
-      if (!best || best.word.length < 4) {
-        this.forceSolvablePath();
-      }
-      return { banked: true, word: word, points: points, rarity: rarity, refilled: refilled, multiplier: multiplier };
+      return {
+        banked: true,
+        word: word,
+        points: points,
+        rarity: rarity,
+        refilled: refilled,
+        multiplier: multiplier,
+        chooseStart: this.awaitingStart
+      };
     }
 
     // This restores one of the five retained actions, including a bank and its score when needed.
@@ -463,8 +533,14 @@
         bankStreak: this.bankStreak,
         rejectedBanks: this.rejectedBanks,
         reviveUsed: Boolean(this.reviveUsed),
+        lives: this.lives,
+        freeStartEnabled: Boolean(this.freeStartEnabled),
+        awaitingStart: Boolean(this.awaitingStart),
+        startMode: this.startMode,
+        roundsCompleted: this.roundsCompleted,
         starterPath: copyData(this.starterPath || []),
-        starterWord: this.starterWord || ""
+        starterWord: this.starterWord || "",
+        lastStarterWord: this.lastStarterWord || ""
       };
     }
 
@@ -492,8 +568,22 @@
       this.bankStreak = state.bankStreak || 0;
       this.rejectedBanks = state.rejectedBanks || 0;
       this.reviveUsed = Boolean(state.reviveUsed);
+      this.lives = Number.isFinite(state.lives) ? state.lives : 2;
+      this.freeStartEnabled = state.freeStartEnabled === undefined ? true : Boolean(state.freeStartEnabled);
+      this.awaitingStart = state.awaitingStart === undefined
+        ? this.chain.length === 0 && this.bodyOrder.length === 0
+        : Boolean(state.awaitingStart);
+      this.startMode = state.startMode === "free" ? "free" : "guided";
+      this.roundsCompleted = state.roundsCompleted || this.wordsFound.length;
       this.starterPath = copyData(state.starterPath || []);
       this.starterWord = state.starterWord || "";
+      this.lastStarterWord = state.lastStarterWord || this.starterWord || "";
+      if (this.awaitingStart) {
+        const restoredHead = this.getCell(this.head.row, this.head.column);
+        if (restoredHead && restoredHead.state === "HEAD") {
+          restoredHead.state = "LETTER";
+        }
+      }
     }
 
     // This produces a short stable fingerprint for comparing deterministic Daily runs.

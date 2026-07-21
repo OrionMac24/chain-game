@@ -12,10 +12,8 @@ Collect these from the four dashboards. Only use public client keys in the app.
 - RevenueCat Google public SDK key
 - AdMob iOS App ID
 - AdMob iOS rewarded unit for `revive`
-- AdMob iOS rewarded unit for `word-hint`
 - AdMob Android App ID
 - AdMob Android rewarded unit for `revive`
-- AdMob Android rewarded unit for `word-hint`
 - Final Apple bundle ID and Android package name. The source currently uses `com.chainwordgame.app`
 
 Never put a Supabase `service_role` key, Apple private key, Google service-account JSON, store password, or RevenueCat secret key in this repository.
@@ -56,7 +54,7 @@ Using the same email for GitHub and Supabase does not link their projects automa
 
 1. Create or open the CHAIN project in [Supabase](https://supabase.com/dashboard).
 
-2. Open SQL Editor, paste the complete contents of `supabase/schema.sql`, and run it. This creates:
+2. For a fresh project, open SQL Editor, paste the complete contents of `supabase/schema.sql`, and run it. For the existing CHAIN project, run `supabase/migrations/202607210002_auth_realtime_fixes.sql`. This creates or repairs:
 
    - public profiles with unique usernames
    - one best score per player per UTC Daily
@@ -84,19 +82,15 @@ Using the same email for GitHub and Supabase does not link their projects automa
 
 5. In Authentication > Providers, keep Email enabled. For production, keep Confirm email enabled. A new player confirms once, then signs in with email and password inside CHAIN.
 
-6. Configure Apple in Authentication > Providers > Apple:
+6. In Authentication > URL Configuration, set the deployed CHAIN URL as the Site URL. Add both `https://OrionMac24.github.io/chain-game/` and `http://localhost:4173/` as Redirect URLs while testing.
 
-   - In Apple Developer, enable Sign in with Apple for `com.chainwordgame.app`.
-   - Add a Services ID for the hosted web version if web Apple login is desired.
-   - Add `https://YOUR_PROJECT.supabase.co/auth/v1/callback` as the return URL.
-   - Create an Apple Sign in with Apple key and use it to create the provider secret in Supabase.
-   - Add the iOS bundle ID to the allowed client IDs. The iOS wrapper already uses Apple's native sheet and supports Hide My Email.
+7. No Apple authentication provider is required. CHAIN uses username, email, and password only.
 
-7. Test with two real accounts. Finish a Daily with account A, open the leaderboard on account B, then finish with a higher score. The order should change without refreshing.
+8. Test with two real accounts. Bank a Daily word with account A, open the leaderboard on account B, then bank a higher score. The order should change without refreshing. Confirm that a signed-out home shows the global all-time high and a signed-in home shows that player's own best.
 
 The database blocks anonymous and duplicate Daily submissions, but no client-only game can fully stop a modified app from inventing a score. Before a large competitive launch, add server-side replay validation or signed move logs.
 
-Official references: [Supabase Realtime](https://supabase.com/docs/guides/realtime/postgres-changes), [Supabase Apple auth](https://supabase.com/docs/guides/auth/social-login/auth-apple).
+Official references: [Supabase email authentication](https://supabase.com/docs/guides/auth/passwords), [Supabase Realtime](https://supabase.com/docs/guides/realtime/postgres-changes).
 
 ## 4. RevenueCat and Chain Pro
 
@@ -136,10 +130,10 @@ Official references: [RevenueCat Android install](https://www.revenuecat.com/doc
 
 ## 5. Google AdMob rewarded videos
 
-The app has two rewarded placements: a one-time Daily revive and a word hint. Rewards are granted only after Google's earned-reward callback. Both platforms also run Google's User Messaging Platform consent flow before requesting ads.
+The app has one rewarded placement: a one-time Daily revive. Rewards are granted only after Google's earned-reward callback. Both platforms also run Google's User Messaging Platform consent flow before requesting ads.
 
 1. In [AdMob](https://admob.google.com), add one iOS app and one Android app.
-2. For each app, create two Rewarded ad units named `chain_revive` and `chain_word_hint`.
+2. For each app, create one Rewarded ad unit named `chain_revive`.
 3. In Privacy & messaging, publish the required European regulations and US state messages. The app shows a Privacy button when Google says a privacy-options entry point is required.
 4. Replace IDs:
 
@@ -165,15 +159,15 @@ Official references: [AdMob iOS setup](https://developers.google.com/admob/ios/q
    ```
 
 3. In Xcode, select the CHAIN target, choose your Apple Developer team, and confirm the bundle ID.
-4. Confirm the Sign in with Apple and In-App Purchase capabilities are present.
+4. Confirm the In-App Purchase capability is present. Sign in with Apple is intentionally not included.
 5. Resolve Swift packages. The project already requests RevenueCat, RevenueCatUI, Google Mobile Ads, and Google User Messaging Platform.
-6. Run on a real iPhone. Test account creation, Apple Hide My Email, leaderboard movement, trail death, a completed test rewarded video, revive, word hint, Paywall, purchase restore, Customer Center, and account deletion.
+6. Run on a real iPhone. Test email account creation, Backspace in every form field, global and personal highest scores, leaderboard movement, the one-life warning, a completed test rewarded video, revive, Paywall, purchase restore, Customer Center, and account deletion.
 7. In App Store Connect, create the app record before uploading. Use the same bundle ID.
 8. Add the three subscription products, screenshots, description, support URL, and privacy policy URL. After Pages is live, use `https://OrionMac24.github.io/chain-game/legal/privacy.html`.
 9. Complete App Privacy accurately for Supabase authentication, RevenueCat purchases, and Google ads.
 10. In Xcode, choose Any iOS Device, then Product > Archive > Distribute App > App Store Connect > Upload.
 11. Test the build in TestFlight with sandbox purchase accounts and AdMob test devices.
-12. Select the processed build in App Store Connect, answer export and advertising questions, add review notes explaining rewarded revive and hint flows, then submit for review.
+12. Select the processed build in App Store Connect, answer export and advertising questions, add review notes explaining the rewarded revive flow, then submit for review.
 
 Official references: [create an App Store record](https://developer.apple.com/help/app-store-connect/create-an-app-record/add-a-new-app/), [upload builds](https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds), [screenshot requirements](https://developer.apple.com/help/app-store-connect/manage-app-information/upload-app-previews-and-screenshots/).
 
