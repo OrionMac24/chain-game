@@ -1,0 +1,68 @@
+:root {
+  color-scheme: dark;
+
+  --bg-base: #05080D;
+  --bg-panel: #0A0F17;
+  --bg-elevated: #111925;
+  --grid-line: #1B2836;
+
+  --ink-primary: #EDF2F7;
+  --ink-secondary: #8A99A8;
+  --ink-tertiary: #4E5C6B;
+
+  --accent-cyan: #22E4E0;
+  --accent-magenta: #FF2E7E;
+  --accent-lime: #A8FF3E;
+
+  --tile-face: #E9EEF3;
+  --tile-letter: #05080D;
+  --tile-body: #16222F;
+  --tile-body-ink: #5B6B7A;
+
+  --glow-cyan: 0 0 12px rgba(34, 228, 224, 0.35);
+  --glow-magenta: 0 0 16px rgba(255, 46, 126, 0.40);
+  --glow-lime: 0 0 12px rgba(168, 255, 62, 0.35);
+  --glow-soft: 0 0 24px rgba(34, 228, 224, 0.12);
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  --r-sm: 3px;
+  --r-md: 5px;
+  --r-lg: 8px;
+  --r-pill: 999px;
+
+  --border-subtle: 1px solid rgba(237, 242, 247, 0.08);
+  --border-active: 1px solid rgba(34, 228, 224, 0.45);
+
+  --t-display: 44px;
+  --t-h1: 28px;
+  --t-h2: 20px;
+  --t-body: 15px;
+  --t-label: 12px;
+  --t-micro: 11px;
+
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
+  --dur-slow: 400ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --content-max: 460px;
+  --touch-min: 48px;
+}
+
+:root[data-high-contrast="true"] {
+  --ink-secondary: #B8C4D0;
+  --grid-line: #31465A;
+  --glow-cyan: none;
+  --glow-magenta: none;
+  --glow-lime: none;
+  --glow-soft: none;
+}

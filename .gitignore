@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+
+# Secrets and signing — NEVER commit these
+*.keystore
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+.env
+.env.*
+local.properties
+service-account*.json
+
+# Android build output
+android/ChainAndroid/build/
+android/ChainAndroid/app/build/
+android/ChainAndroid/.gradle/
+.gradle/
+
+# iOS generated project and user state
+ios/ChainIOS/ChainIOS.xcodeproj/
+**/xcuserdata/
+DerivedData/

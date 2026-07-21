@@ -1,0 +1,332 @@
+@font-face {
+  font-family: "Clash Display";
+  src: url("../assets/fonts/clash-display-700.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Satoshi";
+  src: url("../assets/fonts/satoshi-500.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Satoshi";
+  src: url("../assets/fonts/satoshi-700.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("../assets/fonts/geist-mono-500.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+  background-color: var(--bg-base);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--grid-line) 35%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--grid-line) 35%, transparent) 1px, transparent 1px);
+  background-size: 44px 44px, 44px 44px;
+  color: var(--ink-primary);
+  font-family: "Satoshi", sans-serif;
+}
+
+body {
+  display: grid;
+  place-items: center;
+}
+
+#game {
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  touch-action: none;
+}
+
+#game canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  image-rendering: auto;
+  touch-action: none;
+}
+
+#loading {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-content: center;
+  gap: var(--s-4);
+  text-align: center;
+  background: var(--bg-base);
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+#loading.hidden {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.loading-title {
+  margin: 0;
+  color: var(--accent-cyan);
+  font-family: "Clash Display", sans-serif;
+  font-size: clamp(var(--t-display), 10vw, var(--s-8));
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 0.95;
+  text-shadow: var(--glow-cyan);
+}
+
+.loading-track {
+  width: min(72vw, 320px);
+  height: var(--s-1);
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--bg-elevated);
+}
+
+#loading-bar {
+  width: 8%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-magenta);
+  box-shadow: var(--glow-magenta);
+  transition: width var(--dur-base) var(--ease-out);
+}
+
+#loading-status {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--t-body);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #loading,
+  #loading-bar {
+    transition-duration: 0ms;
+  }
+}
+
+.test-ad {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-content: center;
+  gap: var(--s-3);
+  padding: var(--s-6);
+  background: #020305;
+  color: var(--ink-primary);
+  text-align: center;
+}
+
+.test-ad strong {
+  color: var(--accent-magenta);
+  font-family: "Clash Display", sans-serif;
+  font-size: var(--t-h1);
+}
+
+.test-ad span,
+.test-ad small {
+  font-family: "Geist Mono", monospace;
+  letter-spacing: 0.1em;
+}
+
+.online-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+  background: rgba(2, 4, 7, 0.9);
+}
+
+.online-panel[hidden] {
+  display: none;
+}
+
+.online-card {
+  position: relative;
+  width: min(100%, var(--content-max));
+  max-height: min(720px, 90dvh);
+  overflow: auto;
+  border: var(--border-active);
+  border-radius: var(--r-md);
+  padding: 40px 24px 24px;
+  background: var(--bg-panel);
+  box-shadow: var(--glow-soft);
+}
+
+.online-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-secondary);
+  font: 500 30px/1 "Satoshi", sans-serif;
+}
+
+.online-kicker {
+  margin: 0 0 8px;
+  color: var(--accent-lime);
+  font: 500 var(--t-micro)/1.2 "Geist Mono", monospace;
+  letter-spacing: 0.14em;
+}
+
+.online-card h2 {
+  margin: 0 0 12px;
+  color: var(--ink-primary);
+  font: 700 var(--t-h1)/1.05 "Clash Display", sans-serif;
+}
+
+.online-card p {
+  margin: 0 0 20px;
+  color: var(--ink-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.online-card form {
+  display: grid;
+  gap: 16px;
+}
+
+.online-card label {
+  display: grid;
+  gap: 7px;
+  color: var(--ink-secondary);
+  font: 500 var(--t-micro)/1.2 "Geist Mono", monospace;
+  letter-spacing: 0.1em;
+}
+
+.online-card input {
+  width: 100%;
+  min-height: 50px;
+  border: var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 0 14px;
+  background: var(--bg-elevated);
+  color: var(--ink-primary);
+  font: 500 16px/1 "Satoshi", sans-serif;
+}
+
+.online-card input:focus {
+  border-color: var(--accent-cyan);
+  outline: 2px solid rgba(34, 228, 224, 0.18);
+}
+
+.online-card button[type="submit"],
+.secondary-online {
+  min-height: 50px;
+  border: 1px solid var(--accent-magenta);
+  border-radius: var(--r-sm);
+  padding: 0 16px;
+  background: var(--accent-magenta);
+  color: var(--tile-letter);
+  font: 700 13px/1 "Satoshi", sans-serif;
+  letter-spacing: 0.05em;
+}
+
+.secondary-online.in-form {
+  margin-top: -4px;
+}
+
+.quiet-online {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-secondary);
+  font: 700 11px/1 "Geist Mono", monospace;
+  letter-spacing: 0.08em;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.destructive-online {
+  margin-top: 0;
+  color: #ff6b70;
+}
+
+.secondary-online {
+  width: 100%;
+  margin-top: 12px;
+  border-color: var(--grid-line);
+  background: var(--bg-elevated);
+  color: var(--ink-primary);
+}
+
+.online-status {
+  margin-top: 16px !important;
+  color: var(--ink-secondary) !important;
+  font-family: "Geist Mono", monospace !important;
+  font-size: 12px !important;
+}
+
+.leaderboard-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leaderboard-list li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 54px;
+  border: var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+}
+
+.leaderboard-list li.is-you {
+  border-color: var(--accent-cyan);
+}
+
+.leaderboard-list li > span,
+.leaderboard-list li > b {
+  font-family: "Geist Mono", monospace;
+}
+
+.leaderboard-list li > small {
+  grid-column: 2;
+  color: var(--ink-tertiary);
+}
+
+.leaderboard-list li > b {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  color: var(--accent-lime);
+}

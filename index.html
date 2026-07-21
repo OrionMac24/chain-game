@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>CHAIN</title>
+    <link rel="icon" type="image/png" href="assets/brand/chain-app-icon.png">
+    <link rel="stylesheet" href="css/tokens.css?v=13">
+    <link rel="stylesheet" href="css/app.css?v=13">
+  </head>
+  <body>
+    <main id="game" aria-label="CHAIN word puzzle game"></main>
+    <section id="loading" aria-live="polite">
+      <h1 class="loading-title">CHAIN</h1>
+      <div class="loading-track" aria-hidden="true"><div id="loading-bar"></div></div>
+      <p id="loading-status">Building the word grid…</p>
+    </section>
+
+    <script>window.CHAIN_CONFIG = { supabaseUrl: "", supabaseAnonKey: "", authRedirectUrl: "" };</script>
+    <script src="vendor/supabase.js"></script>
+    <script src="vendor/phaser.min.js"></script>
+    <script src="js/words.js?v=13"></script>
+    <script src="js/board.js?v=13"></script>
+    <script src="js/ads.js?v=13"></script>
+    <script src="js/online.js?v=13"></script>
+    <script src="js/snake.js?v=13"></script>
+    <script src="js/ui.js?v=13"></script>
+    <script src="js/main.js?v=13"></script>
+  </body>
+</html>
