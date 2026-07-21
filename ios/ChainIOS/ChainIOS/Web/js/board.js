@@ -126,20 +126,19 @@
       this.enforceLetterConstraints();
     }
 
-    // This regenerates until the board offers one strong route and a healthy range of real choices.
+    // This regenerates until the board offers one strong route and at least 20 distinct opening words.
     generateVerifiedBoard() {
-      for (let attempt = 0; attempt < 50; attempt += 1) {
+      for (let attempt = 0; attempt < 1000; attempt += 1) {
         this.fillFreshGrid();
         this.installFriendlyWord();
         this.enforceLetterConstraints();
         const best = window.ChainWords.solve(this.grid, this.head, { includeBody: false, minLength: 4 });
         const reachableWords = window.ChainWords.countReachableWords(this.grid, this.head);
-        if (best && best.word.length >= 4 && reachableWords >= 12) {
+        if (best && best.word.length >= 4 && reachableWords >= 20) {
           return best;
         }
       }
-      this.forceSolvablePath();
-      return window.ChainWords.solve(this.grid, this.head, { includeBody: false, minLength: 4 });
+      throw new Error("CHAIN could not create a Daily board with 20 distinct opening words.");
     }
 
     // This installs a reachable four-letter word only after random generation cannot provide one.
@@ -151,8 +150,15 @@
 
     // This plants one familiar opening word selected by the same seeded sequence as the board.
     installFriendlyWord() {
-      const index = Math.floor(this.rng.next() * FRIENDLY_WORDS.length);
-      const word = FRIENDLY_WORDS[index];
+      const startIndex = Math.floor(this.rng.next() * FRIENDLY_WORDS.length);
+      let word = FRIENDLY_WORDS[startIndex];
+      for (let offset = 0; offset < FRIENDLY_WORDS.length; offset += 1) {
+        const candidate = FRIENDLY_WORDS[(startIndex + offset) % FRIENDLY_WORDS.length];
+        if (!this.hasBankedWord(candidate)) {
+          word = candidate;
+          break;
+        }
+      }
       const path = this.installWord(word);
       this.starterPath = path;
       this.starterWord = word;
@@ -370,9 +376,17 @@
       return legal;
     }
 
-    // This declares death only when no fresh tile and no valid bank can save the current run.
+    // This reports whether a word has already scored in this run.
+    hasBankedWord(word) {
+      const normalized = String(word || "").toUpperCase();
+      return this.wordsFound.some(function matchesBankedWord(entry) {
+        return entry.word === normalized;
+      });
+    }
+
+    // This declares death only when no fresh tile and no new valid bank can save the current run.
     isDead() {
-      return this.getLegalMoves().length === 0 && !window.ChainWords.isWord(this.chain);
+      return this.getLegalMoves().length === 0 && (!window.ChainWords.isWord(this.chain) || this.hasBankedWord(this.chain));
     }
 
     // This scores a valid word, clears the body, refills it, and records the word for the summary.
@@ -381,6 +395,10 @@
         this.bankStreak = 0;
         this.rejectedBanks += 1;
         return { banked: false };
+      }
+      if (this.hasBankedWord(this.chain)) {
+        this.rejectedBanks += 1;
+        return { banked: false, duplicate: true, word: this.chain };
       }
       this.remember("bank");
       const word = this.chain;
@@ -412,7 +430,8 @@
         this.starterPath = [];
         this.starterWord = "";
       }
-      const best = window.ChainWords.solve(this.grid, this.head, { includeBody: false, minLength: 4 });
+      const usedWords = this.wordsFound.map(function collectUsedWord(entry) { return entry.word; });
+      const best = window.ChainWords.solve(this.grid, this.head, { includeBody: false, minLength: 4, excludeWords: usedWords });
       if (!best || best.word.length < 4) {
         this.forceSolvablePath();
       }

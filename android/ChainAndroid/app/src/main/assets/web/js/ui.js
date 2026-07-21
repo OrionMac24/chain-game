@@ -50,6 +50,7 @@
       this.screenObjects = [];
       this.boardObjects = [];
       this.overlayObjects = [];
+      this.orientationObjects = [];
       this.inputQueue = [];
       this.currentMode = "daily";
       this.screen = "home";
@@ -74,6 +75,9 @@
       this.scale.on("resize", this.handleResize, this);
       this.events.once("shutdown", this.cleanUp, this);
       this.showHome("daily");
+      if (this.isCompactLandscape()) {
+        this.showOrientationNotice();
+      }
     }
 
     // This remembers a display object so replacing a screen never leaves dead controls behind.
@@ -95,6 +99,7 @@
     // This removes the current screen, board, overlays, and snake before drawing a different view.
     clearEverything() {
       this.destroyGroup(this.overlayObjects);
+      this.destroyGroup(this.orientationObjects);
       this.destroyGroup(this.boardObjects);
       this.destroyGroup(this.screenObjects);
       if (this.feedbackTween) {
@@ -119,6 +124,28 @@
         graphics.lineBetween(0, y, width, y);
       }
       return this.track(graphics);
+    }
+
+    // This keeps the dense 8-by-8 board legible on short phones instead of crushing it into landscape.
+    isCompactLandscape() {
+      return this.scale.width > this.scale.height && this.scale.height < 500;
+    }
+
+    // This blocks accidental play beneath a clear instruction until the phone returns to portrait.
+    showOrientationNotice() {
+      this.destroyGroup(this.orientationObjects);
+      const width = this.scale.width;
+      const height = this.scale.height;
+      const shade = this.add.rectangle(width / 2, height / 2, width, height, COLORS.background, 0.98)
+        .setDepth(100).setInteractive();
+      this.track(shade, this.orientationObjects);
+      this.track(this.add.text(width / 2, height / 2 - 30, "TURN YOUR PHONE", {
+        fontFamily: FONTS.display, fontSize: "30px", fontStyle: "bold", color: COLORS.white
+      }).setOrigin(0.5).setDepth(101), this.orientationObjects);
+      this.track(this.add.text(width / 2, height / 2 + 22, "CHAIN is designed for portrait play.\nRotate upright for a sharp, full-size board.", {
+        fontFamily: FONTS.ui, fontSize: "15px", color: COLORS.muted, align: "center", lineSpacing: 6
+      }).setOrigin(0.5).setDepth(101), this.orientationObjects);
+      this.track(this.add.rectangle(width / 2, height / 2 + 82, 64, 3, COLORS.cyan, 1).setDepth(101), this.orientationObjects);
     }
 
     // This creates one angular working button with hover and disabled states.
@@ -146,13 +173,21 @@
         background.setInteractive({ useHandCursor: true });
         // This runs the real action only after the player releases the pointer over the button.
         background.on("pointerup", onClick);
-        // This provides a restrained brightness cue while a pointer is over a working control.
+        // This makes desktop hover unmistakable while preserving the same working touch target.
         background.on("pointerover", function showButtonHover() {
-          background.setAlpha(0.82);
+          background.setFillStyle(settings.hoverFill === undefined ? fill : settings.hoverFill);
+          background.setStrokeStyle(settings.hoverStrokeWidth || 2, settings.hoverStroke === undefined ? stroke : settings.hoverStroke, 1);
+          background.setAlpha(settings.hoverAlpha === undefined ? 0.92 : settings.hoverAlpha);
+          text.setColor(settings.hoverTextColor || settings.textColor || (brightFill ? COLORS.ink : COLORS.white));
+          container.setScale(settings.hoverScale || 1.015);
         });
         // This restores the normal button opacity when the pointer leaves.
         background.on("pointerout", function hideButtonHover() {
-          background.setAlpha(settings.alpha === undefined ? 1 : settings.alpha);
+          background.setFillStyle(fill);
+          background.setStrokeStyle(settings.strokeWidth === undefined ? 1 : settings.strokeWidth, stroke, settings.strokeAlpha === undefined ? 0.92 : settings.strokeAlpha);
+          background.setAlpha(settings.alpha === undefined ? 0.94 : settings.alpha);
+          text.setColor(settings.textColor || (brightFill ? COLORS.ink : COLORS.white));
+          container.setScale(1);
         });
       } else {
         background.setAlpha(0.36);
@@ -171,18 +206,26 @@
         fill: active === "daily" ? COLORS.cyan : COLORS.panel,
         stroke: COLORS.cyan,
         textColor: active === "daily" ? COLORS.ink : COLORS.tertiary,
-        alpha: active === "daily" ? 0.92 : 0.3,
-        strokeAlpha: active === "daily" ? 0.9 : 0,
+        alpha: active === "daily" ? 0.94 : 0.72,
+        strokeAlpha: 0.95,
+        strokeWidth: active === "daily" ? 2 : 1,
+        hoverFill: active === "daily" ? COLORS.cyan : COLORS.elevated,
+        hoverStroke: COLORS.cyan,
+        hoverTextColor: active === "daily" ? COLORS.ink : "#04E7F0",
         height: 44,
         fontSize: 13,
         group: group
       });
       this.createButton("PRACTICE", x + segment / 2, y, segment, this.showHome.bind(this, "practice"), {
-        fill: active === "practice" ? COLORS.cyan : COLORS.panel,
-        stroke: COLORS.cyan,
+        fill: active === "practice" ? COLORS.magenta : COLORS.panel,
+        stroke: COLORS.magenta,
         textColor: active === "practice" ? COLORS.ink : COLORS.tertiary,
-        alpha: active === "practice" ? 0.92 : 0.3,
-        strokeAlpha: active === "practice" ? 0.9 : 0,
+        alpha: active === "practice" ? 0.94 : 0.72,
+        strokeAlpha: 0.95,
+        strokeWidth: active === "practice" ? 2 : 1,
+        hoverFill: active === "practice" ? COLORS.magenta : COLORS.elevated,
+        hoverStroke: COLORS.magenta,
+        hoverTextColor: active === "practice" ? COLORS.ink : "#FF168B",
         height: 44,
         fontSize: 13,
         group: group
@@ -222,12 +265,12 @@
       }
 
       const activityY = compactHome
-        ? Math.min(height - 185, heroY + 220)
+        ? Math.min(height - (height < 620 ? 205 : 185), heroY + 220)
         : Math.min(height - 205, heroY + 230);
       this.drawWeekActivity(activityY, save);
       const rankY = activityY + (compactHome ? 76 : 82);
       this.track(this.add.text(centreX - 12, rankY, "YOUR HIGHEST SCORE", {
-        fontFamily: FONTS.ui, fontSize: "12px", fontStyle: "bold", color: COLORS.muted, letterSpacing: 0.9
+        fontFamily: FONTS.ui, fontSize: (width < 360 ? 10 : 12) + "px", fontStyle: "bold", color: COLORS.muted, letterSpacing: width < 360 ? 0.5 : 0.9
       }).setOrigin(1, 0.5));
       this.track(this.add.text(centreX + 12, rankY, save.bestScore.toLocaleString("en-US"), {
         fontFamily: FONTS.data, fontSize: "13px", color: COLORS.white, letterSpacing: 0.6
@@ -267,8 +310,10 @@
         fontFamily: FONTS.display, fontSize: "32px", fontStyle: "bold", color: COLORS.white
       }).setOrigin(0.5));
       if (todayResult) {
-        this.createButton("TODAY COMPLETE  ✓", centreX, heroY + 92, Math.min(460, this.scale.width - 48), function noAction() {}, {
-          fill: COLORS.panel, stroke: COLORS.green, textColor: cssToken("--accent-lime"), height: 56, fontSize: 14, disabled: true
+        const qualified = todayResult.qualified === true || todayResult.words >= window.ChainState.dailyTarget;
+        this.createButton(qualified ? "TOMORROW UNLOCKED  ✓" : "RUN ENDED · TRY TOMORROW", centreX, heroY + 92, Math.min(460, this.scale.width - 48), function noAction() {}, {
+          fill: COLORS.panel, stroke: qualified ? COLORS.green : COLORS.red,
+          textColor: qualified ? cssToken("--accent-lime") : "#FF8085", height: 56, fontSize: 13, disabled: true
         });
       } else {
         this.createButton(progress ? "RESUME TODAY" : "PLAY TODAY'S CHAIN", centreX, heroY + 92, Math.min(460, this.scale.width - 48), this.startDaily.bind(this), {
@@ -280,19 +325,20 @@
     // This draws the unlimited Practice entry and the archive of past shared boards.
     drawPracticeHome(heroY) {
       const centreX = this.scale.width / 2;
+      const compactPractice = this.scale.height < 620;
       this.track(this.add.text(centreX, heroY, "PRACTICE", {
         fontFamily: FONTS.data, fontSize: "11px", fontStyle: "bold", color: cssToken("--accent-lime"), letterSpacing: 2
       }).setOrigin(0.5));
-      this.track(this.add.text(centreX, heroY + 34, "UNLIMITED BOARDS", {
-        fontFamily: FONTS.display, fontSize: "30px", fontStyle: "bold", color: COLORS.white
+      this.track(this.add.text(centreX, heroY + (compactPractice ? 30 : 34), "UNLIMITED BOARDS", {
+        fontFamily: FONTS.display, fontSize: (this.scale.width < 360 ? 26 : 30) + "px", fontStyle: "bold", color: COLORS.white
       }).setOrigin(0.5));
-      this.track(this.add.text(centreX, heroY + 66, "Retry, rewind, and sharpen your word finding.", {
-        fontFamily: FONTS.ui, fontSize: "13px", color: COLORS.muted
+      this.track(this.add.text(centreX, heroY + (compactPractice ? 58 : 66), "Retry, rewind, and sharpen your word finding.", {
+        fontFamily: FONTS.ui, fontSize: (this.scale.width < 360 ? 12 : 13) + "px", color: COLORS.muted
       }).setOrigin(0.5));
-      this.createButton("START PRACTICE", centreX, heroY + 112, Math.min(460, this.scale.width - 48), this.startPractice.bind(this, null, "Practice"), {
+      this.createButton("START PRACTICE", centreX, heroY + (compactPractice ? 96 : 112), Math.min(460, this.scale.width - 48), this.startPractice.bind(this, null, "Practice"), {
         fill: COLORS.magenta, stroke: COLORS.magenta, height: 58, fontSize: 16
       });
-      this.createButton("DAILY ARCHIVE", centreX, heroY + 178, Math.min(280, this.scale.width - 64), this.showArchive.bind(this), {
+      this.createButton("DAILY ARCHIVE", centreX, heroY + (compactPractice ? 151 : 178), Math.min(280, this.scale.width - 64), this.showArchive.bind(this), {
         fill: COLORS.panel, stroke: COLORS.grid, textColor: COLORS.white, height: 42, fontSize: 12
       });
     }
@@ -388,7 +434,7 @@
         },
         {
           label: "STEP 3 OF 3 · BANK OR KEEP BUILDING",
-          body: "When your word turns gold, BANK scores it safely. Keep moving only when you can see a stronger word and a safe route.",
+          body: "When your word turns gold, BANK scores it safely. Each word scores once. Find 20 unique words to unlock tomorrow, then keep going for your highest score.",
           action: "GOT IT"
         }
       ];
@@ -437,11 +483,12 @@
 
     // This creates the persistent score, multiplier, pause, chain, and action controls for a run.
     createGameHud() {
-      this.modeLabel = this.track(this.add.text(22, 25, this.runLabel, {
-        fontFamily: FONTS.data, fontSize: "13px", fontStyle: "bold", color: this.currentMode === "daily" ? "#04E7F0" : "#FF168B", letterSpacing: 1.2
+      const compactLabel = this.scale.width < 380 && this.currentMode === "practice" ? "PRACTICE" : this.runLabel;
+      this.modeLabel = this.track(this.add.text(22, 25, compactLabel, {
+        fontFamily: FONTS.data, fontSize: (this.scale.width < 360 ? 11 : 13) + "px", fontStyle: "bold", color: this.currentMode === "daily" ? "#04E7F0" : "#FF168B", letterSpacing: 1.2
       }));
       this.scoreText = this.track(this.add.text(this.scale.width / 2, 25, "SCORE 0", {
-        fontFamily: FONTS.data, fontSize: "16px", fontStyle: "bold", color: COLORS.white
+        fontFamily: FONTS.data, fontSize: (this.scale.width < 360 ? 14 : 16) + "px", fontStyle: "bold", color: COLORS.white
       }).setOrigin(0.5, 0));
       this.wordCountText = this.track(this.add.text(this.scale.width / 2, 50, "", {
         fontFamily: FONTS.data, fontSize: "10px", fontStyle: "bold", color: "#04E7F0", letterSpacing: 1.1
@@ -562,24 +609,33 @@
       this.snake.render(this.board, moveResult);
       this.scoreText.setText("SCORE " + this.board.score.toLocaleString("en-US"));
       this.multiplierText.setText("×" + window.ChainWords.getChainMultiplier(this.board.bankStreak));
-      this.wordCountText.setText(this.startingWordCount + " REACHABLE WORD" + (this.startingWordCount === 1 ? "" : "S") + " AT THE START");
+      if (this.currentMode === "daily") {
+        const found = this.board.wordsFound.length;
+        this.wordCountText.setText(found >= window.ChainState.dailyTarget
+          ? "TOMORROW UNLOCKED"
+          : found + "/" + window.ChainState.dailyTarget + " WORDS TO UNLOCK TOMORROW");
+        this.wordCountText.setColor(found >= window.ChainState.dailyTarget ? "#69F23B" : "#04E7F0");
+      } else {
+        this.wordCountText.setText(this.startingWordCount + " REACHABLE WORD" + (this.startingWordCount === 1 ? "" : "S") + " AT THE START");
+      }
     }
 
     // This updates all four live chain states, their icons, colours, copy, and bank emphasis.
     updateChainFeedback(temporaryMessage) {
       const evaluation = window.ChainWords.evaluateChain(this.board.chain, this.board.bankStreak);
+      const duplicateWord = window.ChainWords.isWord(this.board.chain) && this.board.hasBankedWord(this.board.chain);
       const letters = this.board.chain.split("");
       while (letters.length < 9) {
         letters.push("_");
       }
       this.chainText.setText(letters.join(" "));
-      this.feedbackText.setText(temporaryMessage || (evaluation.icon + "  " + evaluation.text));
-      this.feedbackUnderline.setAlpha(evaluation.state === "DEAD" ? 0.75 : 0);
+      this.feedbackText.setText(temporaryMessage || (duplicateWord ? "×  Already banked. Each word scores once." : (evaluation.icon + "  " + evaluation.text)));
+      this.feedbackUnderline.setAlpha(evaluation.state === "DEAD" || duplicateWord ? 0.75 : 0);
       if (this.feedbackTween) {
         this.feedbackTween.stop();
         this.feedbackTween = null;
       }
-      if (evaluation.state === "DEAD") {
+      if (evaluation.state === "DEAD" || duplicateWord) {
         this.chainText.setColor("#77737C");
         this.feedbackText.setColor("#C46B61");
         this.bankButton.background.setFillStyle(COLORS.panel);
@@ -756,6 +812,18 @@
         }
         return;
       }
+      if (this.board.hasBankedWord(this.board.chain)) {
+        this.board.bank();
+        this.updateChainFeedback("×  " + this.board.chain + " is already gone. Find a new word.");
+        this.tweens.add({ targets: this.chainText, x: this.chainText.x + 6, duration: 45, yoyo: true, repeat: 2 });
+        if (this.currentMode === "daily") {
+          window.ChainState.saveDailyProgress(this.board);
+        }
+        if (this.board.isDead()) {
+          this.beginDeath("boxed-in");
+        }
+        return;
+      }
       this.animating = true;
       const body = this.board.bodyOrder.slice();
       const head = { row: this.board.head.row, column: this.board.head.column };
@@ -768,6 +836,9 @@
       this.playSound("success");
       this.renderBoard(null, result.refilled);
       this.updateChainFeedback("◆  " + result.word + " banked for " + result.points + " points");
+      if (this.currentMode === "daily" && this.board.wordsFound.length === window.ChainState.dailyTarget) {
+        this.showRarityToast("TOMORROW UNLOCKED");
+      }
       if (result.rarity === "RARE" || result.rarity === "ELITE") {
         this.showRarityToast(result.rarity + " WORD");
       }
@@ -786,7 +857,8 @@
       const friendlyOpening = this.board.chain.length === 0 && this.board.starterWord && this.board.starterPath.length
         ? { word: this.board.starterWord, path: this.board.starterPath.slice() }
         : null;
-      const solution = friendlyOpening || window.ChainWords.solve(this.board.grid, this.board.head, { includeBody: false, minLength: 3 });
+      const usedWords = this.board.wordsFound.map(function collectUsedWord(entry) { return entry.word; });
+      const solution = friendlyOpening || window.ChainWords.solve(this.board.grid, this.board.head, { includeBody: false, minLength: 3, excludeWords: usedWords });
       if (!solution) {
         this.updateChainFeedback("×  No fresh word route remains from this tile.");
         return;
@@ -869,7 +941,8 @@
       this.animating = true;
       this.deathReason = reason === "trail" ? "trail" : "boxed-in";
       this.deathRestoreState = this.preMoveState || this.board.exportState();
-      const solution = window.ChainWords.solve(this.board.grid, this.board.head, { includeBody: true });
+      const usedWords = this.board.wordsFound.map(function collectUsedWord(entry) { return entry.word; });
+      const solution = window.ChainWords.solve(this.board.grid, this.board.head, { includeBody: true, excludeWords: usedWords });
       if (solution && !window.ChainWords.verifySolution(this.board.grid, this.board.head, solution)) {
         throw new Error("The solver produced a path that is not legally reachable.");
       }
@@ -900,13 +973,16 @@
       this.track(this.add.text(width / 2, height / 2 - 18, "SCORE  " + this.board.score.toLocaleString("en-US"), {
         fontFamily: FONTS.data, fontSize: "17px", color: COLORS.white, letterSpacing: 1
       }).setOrigin(0.5).setDepth(42), this.overlayObjects);
+      this.track(this.add.text(width / 2, height / 2 + 12, this.board.wordsFound.length + "/" + window.ChainState.dailyTarget + " WORDS", {
+        fontFamily: FONTS.data, fontSize: "12px", color: this.board.wordsFound.length >= window.ChainState.dailyTarget ? "#69F23B" : "#FF8085", letterSpacing: 1
+      }).setOrigin(0.5).setDepth(42), this.overlayObjects);
       const reviveAvailable = !this.board.reviveUsed && window.ChainAds.isAvailable();
       if (reviveAvailable) {
-        this.createButton("WATCH VIDEO · REVIVE", width / 2, height / 2 + 48, panelWidth - 48, this.watchRevive.bind(this), {
+        this.createButton("WATCH VIDEO · REVIVE", width / 2, height / 2 + 62, panelWidth - 48, this.watchRevive.bind(this), {
           fill: COLORS.magenta, stroke: COLORS.magenta, height: 52, fontSize: 14, depth: 42, group: this.overlayObjects
         });
       }
-      this.createButton(this.board.reviveUsed ? "END RUN" : "KEEP SCORE · END RUN", width / 2, height / 2 + (reviveAvailable ? 112 : 70), panelWidth - 96, this.finishDeath.bind(this), {
+      this.createButton(this.board.reviveUsed ? "END RUN" : "KEEP SCORE · END RUN", width / 2, height / 2 + (reviveAvailable ? 124 : 82), panelWidth - 96, this.finishDeath.bind(this), {
         fill: COLORS.panel, stroke: COLORS.grid, textColor: COLORS.white, height: 48, fontSize: 12, depth: 42, group: this.overlayObjects
       });
     }
@@ -960,9 +1036,21 @@
       this.track(shade, this.overlayObjects);
       this.track(panel, this.overlayObjects);
       const top = Math.max(46, height / 2 - Math.min(height - 28, 590) / 2 + 26);
-      this.track(this.add.text(width / 2, top, this.deathReason === "trail" ? "TRAIL HIT" : "BOXED IN", {
-        fontFamily: FONTS.display, fontSize: "34px", fontStyle: "bold", color: COLORS.white
+      const qualified = this.currentMode === "daily" && this.board.wordsFound.length >= window.ChainState.dailyTarget;
+      const summaryTitle = this.currentMode === "daily"
+        ? (qualified ? "TOMORROW UNLOCKED" : "DAILY FAILED")
+        : (this.deathReason === "trail" ? "TRAIL HIT" : "BOXED IN");
+      this.track(this.add.text(width / 2, top, summaryTitle, {
+        fontFamily: FONTS.display, fontSize: (width < 480 ? 26 : 34) + "px", fontStyle: "bold", color: COLORS.white
       }).setOrigin(0.5).setDepth(32), this.overlayObjects);
+      if (this.currentMode === "daily") {
+        this.track(this.add.text(width / 2, top + 94, qualified
+          ? this.board.wordsFound.length + " WORDS · YOU QUALIFIED"
+          : this.board.wordsFound.length + "/" + window.ChainState.dailyTarget + " WORDS · TRY AGAIN TOMORROW", {
+          fontFamily: FONTS.data, fontSize: "11px", fontStyle: "bold",
+          color: qualified ? "#69F23B" : "#FF8085", letterSpacing: 1
+        }).setOrigin(0.5).setDepth(32), this.overlayObjects);
+      }
       this.track(this.add.text(width / 2, top + 46, "FINAL SCORE  " + this.board.score.toLocaleString("en-US"), {
         fontFamily: FONTS.data, fontSize: "18px", fontStyle: "bold", color: "#D4A24C"
       }).setOrigin(0.5).setDepth(32), this.overlayObjects);
@@ -1031,7 +1119,8 @@
       }
       const best = result.bestWord ? result.bestWord.word + " (" + result.bestWord.points + ")" : "None";
       const url = window.location.origin + window.location.pathname;
-      let text = "CHAIN #" + result.number + "\n" + result.score.toLocaleString("en-US") + " pts · " + result.words + " words\nBest: " + best + "\n🔥 " + result.streak + " day streak\n" + url;
+      const outcome = result.words >= window.ChainState.dailyTarget ? "Tomorrow unlocked" : result.words + "/" + window.ChainState.dailyTarget + " words";
+      let text = "CHAIN #" + result.number + "\n" + result.score.toLocaleString("en-US") + " pts · " + outcome + "\nBest: " + best + "\n🔥 " + result.streak + " day streak\n" + url;
       if (text.length > 199) {
         text = text.slice(0, 196) + "…";
       }
@@ -1118,7 +1207,7 @@
       this.destroyGroup(this.overlayObjects);
       const width = this.scale.width;
       const height = this.scale.height;
-      const dailyWarning = this.currentMode === "daily" ? "Your daily attempt will be lost." : "Leave this run?";
+      const dailyWarning = this.currentMode === "daily" ? "Leaving ends today's run. Reach 20 first." : "Leave this run?";
       this.track(this.add.rectangle(width / 2, height / 2, width, height, COLORS.background, 0.92).setDepth(45), this.overlayObjects);
       this.track(this.add.rectangle(width / 2, height / 2, Math.min(430, width - 32), 230, COLORS.panel, 1).setStrokeStyle(2, COLORS.red, 0.8).setDepth(46), this.overlayObjects);
       this.track(this.add.text(width / 2, height / 2 - 62, dailyWarning, {
@@ -1210,12 +1299,17 @@
         {
           label: "THE IDEA",
           title: "SCRABBLE MEETS SNAKE",
-          body: "Move one tile at a time to spell words. Every letter grows your red trail. Bank a valid word to score it. The daily goal is simple: finish with the highest score you can."
+          body: "Move one tile at a time to spell words. Every letter grows your red trail. Bank a valid word to score it. A banked word is gone for that run, so every word scores only once."
+        },
+        {
+          label: "THE DAILY GOAL",
+          title: "FIND 20, THEN AIM HIGH",
+          body: "Bank 20 unique words to unlock tomorrow's challenge. Every Daily begins with at least 20 reachable words, but 20 is never the maximum. Once qualified, keep playing for the highest score you can."
         },
         {
           label: "THE BOARD",
           title: "FOLLOW START, THEN THINK AHEAD",
-          body: "START points toward an easy first word in Practice. Outlined tiles are safe moves. Red tiles are your used path, so stepping into an older red tile ends the run. Practice lets you rewind while you learn."
+          body: "START points toward an easy first word in Practice. Outlined tiles are safe moves. Red tiles are your used path, so stepping into an older red tile ends the run. Finish below 20 and today's Daily fails."
         }
       ];
       const index = Phaser.Math.Clamp(Number(page) || 0, 0, steps.length - 1);
@@ -1230,8 +1324,8 @@
       const labelOffset = compactHeight ? -204 : -214;
       const titleOffset = compactHeight ? -166 : -174;
       const exampleOffset = compactHeight ? -68 : -70;
-      const bodyOffset = compactHeight ? 62 : 68;
-      const markerOffset = compactHeight ? 142 : 158;
+      const bodyOffset = compactHeight ? 72 : 68;
+      const markerOffset = compactHeight ? 145 : 158;
       const navOffset = compactHeight ? 188 : 214;
       const closeOffset = compactHeight ? 240 : 270;
       this.track(this.add.rectangle(width / 2, height / 2, width, height, COLORS.background, 0.92).setDepth(70), this.overlayObjects);
@@ -1247,10 +1341,10 @@
         fontFamily: FONTS.display, fontSize: Math.min(27, Math.max(20, width * 0.052)) + "px",
         fontStyle: "bold", color: COLORS.white, align: "center", wordWrap: { width: panelWidth - 54 }
       }).setOrigin(0.5).setDepth(72), this.overlayObjects);
-      this.drawTutorialExample(index === 0 ? 0 : 3, width / 2, height / 2 + exampleOffset, panelWidth);
+      this.drawTutorialExample([0, 1, 2][index], width / 2, height / 2 + exampleOffset, panelWidth);
       this.track(this.add.text(width / 2, height / 2 + bodyOffset, step.body, {
-        fontFamily: FONTS.ui, fontSize: "14px", color: COLORS.white, align: "center",
-        lineSpacing: 7, wordWrap: { width: panelWidth - 74 }
+        fontFamily: FONTS.ui, fontSize: (compactHeight ? 13 : 14) + "px", color: COLORS.white, align: "center",
+        lineSpacing: compactHeight ? 5 : 7, wordWrap: { width: panelWidth - 74 }
       }).setOrigin(0.5).setDepth(72), this.overlayObjects);
 
       for (let marker = 0; marker < steps.length; marker += 1) {
@@ -1265,7 +1359,7 @@
           fill: COLORS.panel, stroke: 0x77737C, textColor: COLORS.white, height: 44, fontSize: 12, depth: 72, group: this.overlayObjects
         });
       }
-      this.createButton(index === steps.length - 1 ? (width < 380 ? "START PRACTICE" : "START FIRST PRACTICE") : "NEXT", index > 0 ? width / 2 + tutorialButtonOffset : width / 2, height / 2 + navOffset, index > 0 ? tutorialButtonWidth : Math.min(260, panelWidth - 48),
+      this.createButton(index === steps.length - 1 ? (width < 480 ? "START PRACTICE" : "START FIRST PRACTICE") : "NEXT", index > 0 ? width / 2 + tutorialButtonOffset : width / 2, height / 2 + navOffset, index > 0 ? tutorialButtonWidth : Math.min(260, panelWidth - 48),
         index === steps.length - 1 ? this.finishTutorial.bind(this, true) : this.showTutorial.bind(this, index + 1), {
           fill: COLORS.magenta, stroke: COLORS.magenta,
           height: 44, fontSize: width < 380 ? 11 : 13, depth: 72, group: this.overlayObjects
@@ -1390,6 +1484,11 @@
 
     // This redraws the current top-level view when the browser changes size.
     handleResize() {
+      if (this.isCompactLandscape()) {
+        this.showOrientationNotice();
+        return;
+      }
+      this.destroyGroup(this.orientationObjects);
       if (this.screen === "home") {
         this.showHome(this.currentMode);
       } else if (this.screen === "archive") {

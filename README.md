@@ -7,8 +7,10 @@ CHAIN is a daily word-snake game. Players move across one shared board, spell an
 - Responsive browser game with Daily and unlimited Practice modes
 - Guided visual tutorial and beginner-friendly opening words
 - Deterministic 8 by 8 boards using a weighted letter bag
-- Minimum 16 vowels and no more than one total Q, J, X, or Z per board
+- At least 20 distinct reachable opening words, minimum 16 vowels, and no more than one total Q, J, X, or Z per board
+- One score per unique word, with 20 banked words required to unlock the next Daily
 - Fatal red-trail collisions, boxed-in deaths, one rewarded revive, and rewarded word hints
+- Retina-density rendering, compact-phone layouts, and an intentional portrait-phone experience
 - Supabase email accounts, native iOS Apple sign-in, usernames, account deletion, and live leaderboard
 - RevenueCat Paywall, Chain Pro entitlement checks, restore, and Customer Center
 - Google rewarded ads with consent flows for iOS and Android
@@ -19,7 +21,7 @@ CHAIN is a daily word-snake game. Players move across one shared board, spell an
 
 Serve the repository root with any static server, then open it in a browser. The current local preview uses `http://localhost:4173`.
 
-Before online accounts work, add the Supabase project URL and publishable key to `window.CHAIN_CONFIG` in `index.html`, then run:
+After changing shared web files or the existing public Supabase configuration, run:
 
 ```bash
 ./scripts/sync-web.sh

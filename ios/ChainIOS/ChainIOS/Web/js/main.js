@@ -4,6 +4,8 @@
 
   const SAVE_KEY = "chain-save-v2";
   const LAUNCH_DATE = new Date(2025, 5, 5);
+  const DAILY_TARGET = 20;
+  const BOARD_VERSION = 3;
   const DEFAULT_SAVE = {
     bestScore: 0,
     lifetimeWords: 0,
@@ -131,6 +133,7 @@
     saveData.inProgressDaily = {
       date: dateKey(),
       number: dailyNumber(),
+      boardVersion: BOARD_VERSION,
       board: board.exportState(),
       hash: board.getHash()
     };
@@ -139,7 +142,7 @@
 
   // This returns today's unfinished Daily only when it still belongs to the current local date.
   function getDailyProgress() {
-    if (saveData.inProgressDaily && saveData.inProgressDaily.date === dateKey()) {
+    if (saveData.inProgressDaily && saveData.inProgressDaily.date === dateKey() && saveData.inProgressDaily.boardVersion === BOARD_VERSION) {
       return copy(saveData.inProgressDaily);
     }
     return null;
@@ -163,14 +166,19 @@
     if (existing) {
       return existing;
     }
+    const qualified = board.wordsFound.length >= DAILY_TARGET;
     const yesterday = new Date(Date.now() - 86400000);
-    if (saveData.lastDailyPlayed === dateKey(yesterday)) {
+    if (qualified && saveData.lastDailyPlayed === dateKey(yesterday)) {
       saveData.dailyStreak += 1;
-    } else {
+    } else if (qualified) {
       saveData.dailyStreak = 1;
+    } else {
+      saveData.dailyStreak = 0;
+    }
+    if (qualified) {
+      saveData.lastDailyPlayed = today;
     }
     saveData.longestStreak = Math.max(saveData.longestStreak, saveData.dailyStreak);
-    saveData.lastDailyPlayed = today;
     // This puts the highest-scoring word first for the Daily result and share card.
     const sortedWords = board.wordsFound.slice().sort(function sortByPoints(first, second) {
       return second.points - first.points;
@@ -180,6 +188,8 @@
       number: dailyNumber(),
       score: board.score,
       words: board.wordsFound.length,
+      qualified: qualified,
+      target: DAILY_TARGET,
       bestWord: sortedWords[0] || null,
       streak: saveData.dailyStreak,
       hash: board.getHash()
@@ -230,6 +240,7 @@
     dateKey: dateKey,
     dateFromKey: dateFromKey,
     dailyNumber: dailyNumber,
+    dailyTarget: DAILY_TARGET,
     rankForScore: rankForScore,
     recordProgress: recordProgress,
     saveDailyProgress: saveDailyProgress,

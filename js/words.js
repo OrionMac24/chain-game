@@ -209,6 +209,9 @@
     const settings = options || {};
     const includeBody = Boolean(settings.includeBody);
     const minimumLength = Number.isFinite(settings.minLength) ? settings.minLength : 3;
+    const excludedWords = new Set((settings.excludeWords || []).map(function normalizeExcludedWord(word) {
+      return String(word).toUpperCase();
+    }));
     const size = board.length;
     const visited = new Set([head.row + ":" + head.column]);
     let best = null;
@@ -216,7 +219,7 @@
 
     // This explores one legal snake path and stops as soon as its letters leave the trie.
     function visit(row, column, node, word, path) {
-      if (word.length >= minimumLength && node.word) {
+      if (word.length >= minimumLength && node.word && !excludedWords.has(word)) {
         const points = scoreWord(word);
         if (!best || points > best.points || (points === best.points && word.length > best.word.length)) {
           best = { word: word, points: points, path: path.slice(), rarity: getRarity(word) };
@@ -274,6 +277,9 @@
   function countReachableWords(board, head, options) {
     const settings = options || {};
     const includeBody = Boolean(settings.includeBody);
+    const excludedWords = new Set((settings.excludeWords || []).map(function normalizeExcludedWord(word) {
+      return String(word).toUpperCase();
+    }));
     const size = board.length;
     const visited = new Set([head.row + ":" + head.column]);
     const found = new Set();
@@ -281,7 +287,7 @@
 
     // This follows one legal route and records each complete dictionary word only once.
     function visit(row, column, node, word) {
-      if (word.length >= 3 && node.word) {
+      if (word.length >= 3 && node.word && !excludedWords.has(word)) {
         found.add(word);
       }
       if (word.length >= 9) {

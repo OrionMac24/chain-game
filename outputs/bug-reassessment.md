@@ -7,6 +7,9 @@ Date: July 21, 2026
 - Removed the oversized decorative circle from the home screen.
 - Rebuilt mobile spacing so buttons, streak details, tutorials, and archive controls do not overlap or clip.
 - Added Retina-density canvas rendering, real-font loading before Phaser draws, and compact Safari-height spacing so iPhone text and tiles stay crisp instead of fuzzy or compressed.
+- Added explicit compact landscape handling, portrait orientation in both native wrappers, and verified layouts at 320 by 568, 393 by 659, 393 by 852, 768 by 1024, and 1280 by 720.
+- Prevented every duplicate word from scoring twice and marked repeated words as already banked in the live feedback.
+- Raised the Daily opening guarantee to at least 20 distinct reachable words and added the 20-word qualification state, progress HUD, tutorial, success toast, failure result, and tomorrow-unlocked home state.
 - Reworked the tutorial with illustrated board examples, shorter mobile copy, and a guided first-run coach.
 - Made a red trail collision fatal in Daily. Reversing into the previous red tile now ends the run instead of showing a blocked-path message.
 - Kept Practice forgiving with a separate rewind action.
@@ -25,7 +28,8 @@ Date: July 21, 2026
 - Android manifest XML: pass.
 - iOS asset catalog JSON: pass.
 - Shell sync script syntax: pass.
-- Board generation: 10,000 deterministic boards checked, minimum 16 vowels, maximum one combined Q, J, X, or Z.
+- Board generation: 10,000 deterministic boards checked, minimum 20 reachable opening words, minimum 16 vowels, maximum one combined Q, J, X, or Z.
+- Duplicate scoring: rejected without changing score or the banked-word list.
 - Reverse collision: checked as a fatal red-trail target.
 
 ## Browser checks
